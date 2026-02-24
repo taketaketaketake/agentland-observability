@@ -1,0 +1,68 @@
+# Multi-Agent Observability System (React)
+# Usage: just <recipe>
+
+set dotenv-load
+set quiet
+
+server_port := env("SERVER_PORT", "4000")
+client_port := env("CLIENT_PORT", "5173")
+project_root := justfile_directory()
+
+default:
+    @just --list
+
+# --- System ---
+
+start:
+    ./scripts/start-system.sh
+
+stop:
+    ./scripts/reset-system.sh
+
+restart: stop start
+
+# --- Server (Bun, port 4000) ---
+
+server-install:
+    cd {{project_root}}/apps/server && bun install
+
+server:
+    cd {{project_root}}/apps/server && SERVER_PORT={{server_port}} bun run dev
+
+server-prod:
+    cd {{project_root}}/apps/server && SERVER_PORT={{server_port}} bun run start
+
+# --- Client (React + Vite, port 5173) ---
+
+client-install:
+    cd {{project_root}}/apps/client && npm install
+
+client:
+    cd {{project_root}}/apps/client && VITE_PORT={{client_port}} npm run dev
+
+client-build:
+    cd {{project_root}}/apps/client && npm run build
+
+# --- Install ---
+
+install: server-install client-install
+
+# --- Database ---
+
+db-reset:
+    rm -f {{project_root}}/apps/server/events.db {{project_root}}/apps/server/events.db-wal {{project_root}}/apps/server/events.db-shm
+    @echo "Database reset"
+
+# --- Testing ---
+
+test-event:
+    curl -s -X POST http://localhost:{{server_port}}/events \
+      -H "Content-Type: application/json" \
+      -d '{"source_app":"test","session_id":"test-1234","hook_event_type":"PreToolUse","payload":{"tool_name":"Bash","tool_input":{"command":"echo hello"}}}' \
+      | head -c 200
+    @echo ""
+
+# --- Open ---
+
+open:
+    open http://localhost:{{client_port}}

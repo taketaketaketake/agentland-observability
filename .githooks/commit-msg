@@ -1,0 +1,8 @@
+#!/bin/bash
+# Reject commits with AI co-authorship lines
+if grep -iE "Co-Authored-By:.*\b(claude|anthropic|copilot|openai|chatgpt|gemini|ai)\b" "$1"; then
+  echo ""
+  echo "ERROR: AI co-authorship lines are not allowed in commit messages."
+  echo "Remove the Co-Authored-By line and try again."
+  exit 1
+fi
