@@ -3,16 +3,22 @@ import type { EvalResult } from '../types';
 import { getAssistantMessages, getPrecedingUserMessage } from '../evaluations';
 import { callLLM, getEvalModel, parseJudgeResponse } from './llmProvider';
 
-export const TRANSCRIPT_QUALITY_PROMPT_VERSION = 'v1';
+export const TRANSCRIPT_QUALITY_PROMPT_VERSION = 'v2';
 
-const SYSTEM_PROMPT = `You are an evaluation judge. Score the assistant's response on three dimensions:
+const SYSTEM_PROMPT = `You are an evaluation judge. Score the interaction on two sections:
+
+**User Input Quality**
+- input_clarity (1-5): How clear, specific, and unambiguous is the user's request?
+- input_context (1-5): Does the user provide sufficient context, constraints, and relevant details?
+
+**Assistant Response Quality**
 - helpfulness (1-5): How well does the response address the user's needs?
 - accuracy (1-5): Is the information factually correct and the code/solution valid?
 - conciseness (1-5): Is the response appropriately concise without unnecessary verbosity?
 
 Respond with a JSON object inside a fenced code block:
 \`\`\`json
-{"helpfulness": <1-5>, "accuracy": <1-5>, "conciseness": <1-5>, "rationale": "<brief explanation>"}
+{"input_clarity": <1-5>, "input_context": <1-5>, "helpfulness": <1-5>, "accuracy": <1-5>, "conciseness": <1-5>, "rationale": "<brief explanation>"}
 \`\`\``;
 
 function stratifiedSample<T extends { session_id: string }>(items: T[], limit: number): T[] {
@@ -82,6 +88,7 @@ export const transcriptQualityEvaluator: Evaluator = {
 
     const results: Omit<EvalResult, 'id'>[] = [];
     let totalHelpfulness = 0, totalAccuracy = 0, totalConciseness = 0;
+    let totalInputClarity = 0, totalInputContext = 0;
     let scoredCount = 0;
 
     for (let i = 0; i < sampled.length; i++) {
@@ -109,6 +116,8 @@ export const transcriptQualityEvaluator: Evaluator = {
           totalHelpfulness += parsed.helpfulness;
           totalAccuracy += parsed.accuracy;
           totalConciseness += parsed.conciseness;
+          totalInputClarity += parsed.input_clarity ?? 0;
+          totalInputContext += parsed.input_context ?? 0;
           scoredCount++;
 
           results.push({
@@ -119,6 +128,8 @@ export const transcriptQualityEvaluator: Evaluator = {
             item_id: msg.uuid,
             numeric_score: numericScore,
             scores_json: {
+              input_clarity: parsed.input_clarity,
+              input_context: parsed.input_context,
               helpfulness: parsed.helpfulness,
               accuracy: parsed.accuracy,
               conciseness: parsed.conciseness,
@@ -170,6 +181,8 @@ export const transcriptQualityEvaluator: Evaluator = {
     }
 
     const summary = {
+      avg_input_clarity: scoredCount > 0 ? totalInputClarity / scoredCount : 0,
+      avg_input_context: scoredCount > 0 ? totalInputContext / scoredCount : 0,
       avg_helpfulness: scoredCount > 0 ? totalHelpfulness / scoredCount : 0,
       avg_accuracy: scoredCount > 0 ? totalAccuracy / scoredCount : 0,
       avg_conciseness: scoredCount > 0 ? totalConciseness / scoredCount : 0,

@@ -4,6 +4,8 @@ import type { EvaluatorType } from '../types';
 
 const METRICS: Record<string, { evaluator: EvaluatorType; field: string }[]> = {
   tool_success_rate: [{ evaluator: 'tool_success', field: 'numeric_score' }],
+  avg_input_clarity: [{ evaluator: 'transcript_quality', field: 'input_clarity' }],
+  avg_input_context: [{ evaluator: 'transcript_quality', field: 'input_context' }],
   avg_helpfulness: [{ evaluator: 'transcript_quality', field: 'helpfulness' }],
   avg_accuracy: [{ evaluator: 'transcript_quality', field: 'accuracy' }],
   avg_conciseness: [{ evaluator: 'transcript_quality', field: 'conciseness' }],

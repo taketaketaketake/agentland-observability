@@ -298,14 +298,25 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
           onProviderChange={(v) => setSelectedProviders(prev => ({ ...prev, transcript_quality: v }))}
         >
           {getSummary('transcript_quality')?.summary && (
-            <ScoreDistributionChart
-              scores={{
-                Helpfulness: getSummary('transcript_quality')!.summary.avg_helpfulness,
-                Accuracy: getSummary('transcript_quality')!.summary.avg_accuracy,
-                Conciseness: getSummary('transcript_quality')!.summary.avg_conciseness,
-              }}
-              maxScore={5}
-            />
+            <>
+              <div className="text-[9px] font-mono font-semibold tracking-widest uppercase text-[var(--theme-text-quaternary)] mb-1">User Input</div>
+              <ScoreDistributionChart
+                scores={{
+                  Clarity: getSummary('transcript_quality')!.summary.avg_input_clarity ?? 0,
+                  Context: getSummary('transcript_quality')!.summary.avg_input_context ?? 0,
+                }}
+                maxScore={5}
+              />
+              <div className="text-[9px] font-mono font-semibold tracking-widest uppercase text-[var(--theme-text-quaternary)] mt-3 mb-1">Assistant Response</div>
+              <ScoreDistributionChart
+                scores={{
+                  Helpfulness: getSummary('transcript_quality')!.summary.avg_helpfulness,
+                  Accuracy: getSummary('transcript_quality')!.summary.avg_accuracy,
+                  Conciseness: getSummary('transcript_quality')!.summary.avg_conciseness,
+                }}
+                maxScore={5}
+              />
+            </>
           )}
         </EvaluatorCard>
 
