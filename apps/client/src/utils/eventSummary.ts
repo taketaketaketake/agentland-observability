@@ -126,6 +126,27 @@ export function getEventSummary(event: HookEvent): string {
     }
   }
 
+  // Git events
+  if (type.startsWith('Git')) {
+    const p = event.payload || {};
+    switch (type) {
+      case 'GitPreCommit':
+        return `Pre-commit: ${p.staged_file_count ?? 0} file(s) on ${p.branch || 'unknown'}`;
+      case 'GitPostCommit':
+        return `Committed: ${p.commit_message || 'unknown'} (${p.commit_short || '?'})`;
+      case 'GitPrePush':
+        return `Pushing: ${p.commit_count ?? 0} commit(s) to ${p.remote_name || 'origin'}/${p.branch || 'unknown'}`;
+      case 'GitPostCheckout':
+        return `Checkout: ${p.branch || 'unknown'}`;
+      case 'GitPostMerge':
+        return `Merged into ${p.branch || 'unknown'} (${p.changed_file_count ?? 0} files)`;
+      case 'GitPostRewrite': {
+        const label = p.rewrite_type ? p.rewrite_type.charAt(0).toUpperCase() + p.rewrite_type.slice(1) : 'Rewrite';
+        return `${label}: ${p.rewritten_count ?? 0} commit(s) rewritten`;
+      }
+    }
+  }
+
   // Fallback: show last assistant message if present
   if (lastMsg) return extractFirstSentence(lastMsg);
 

@@ -1,0 +1,51 @@
+#!/bin/bash
+# Git hook: post-commit → POST GitPostCommit event to observability server
+
+SERVER_URL="${OBSERVABILITY_SERVER:-http://localhost:4000}"
+REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null)"
+SESSION_ID="$(echo -n "$REPO_PATH" | shasum -a 256 | cut -c1-36)"
+BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo 'detached')"
+
+COMMIT_HASH="$(git rev-parse HEAD)"
+COMMIT_SHORT="$(git rev-parse --short HEAD)"
+COMMIT_MESSAGE="$(git log -1 --format=%s)"
+AUTHOR="$(git log -1 --format='%an <%ae>')"
+
+# Changed file stats
+CHANGED_COUNT="$(git diff-tree --no-commit-id --name-only -r HEAD | grep -c . || echo 0)"
+STAT_LINE="$(git diff-tree --no-commit-id --stat -r HEAD | tail -1)"
+INSERTIONS="$(echo "$STAT_LINE" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)"
+DELETIONS="$(echo "$STAT_LINE" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)"
+
+SUMMARY="Committed: ${COMMIT_MESSAGE} (${COMMIT_SHORT})"
+# Truncate summary to 120 chars
+SUMMARY="${SUMMARY:0:120}"
+
+PAYLOAD="$(jq -n \
+  --arg branch "$BRANCH" \
+  --arg commit_hash "$COMMIT_HASH" \
+  --arg commit_short "$COMMIT_SHORT" \
+  --arg commit_message "$COMMIT_MESSAGE" \
+  --arg author "$AUTHOR" \
+  --argjson changed_file_count "${CHANGED_COUNT:-0}" \
+  --argjson insertions "${INSERTIONS:-0}" \
+  --argjson deletions "${DELETIONS:-0}" \
+  --arg claude_session_id "${CLAUDE_SESSION_ID:-}" \
+  '{branch: $branch, commit_hash: $commit_hash, commit_short: $commit_short, commit_message: $commit_message, author: $author, changed_file_count: $changed_file_count, insertions: $insertions, deletions: $deletions, claude_session_id: $claude_session_id}'
+)"
+
+BODY="$(jq -n \
+  --arg source_app "git" \
+  --arg session_id "$SESSION_ID" \
+  --arg hook_event_type "GitPostCommit" \
+  --arg summary "$SUMMARY" \
+  --argjson payload "$PAYLOAD" \
+  '{source_app: $source_app, session_id: $session_id, hook_event_type: $hook_event_type, summary: $summary, payload: $payload}'
+)"
+
+curl -s -X POST "${SERVER_URL}/events" \
+  -H "Content-Type: application/json" \
+  -d "$BODY" \
+  --connect-timeout 1 --max-time 2 >/dev/null 2>&1 &
+
+exit 0

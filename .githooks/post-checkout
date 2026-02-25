@@ -1,0 +1,43 @@
+#!/bin/bash
+# Git hook: post-checkout → POST GitPostCheckout event to observability server
+# Receives: $1=previous_head $2=new_head $3=checkout_type (1=branch, 0=file)
+
+# Only emit for branch checkouts, not file-level restores
+if [ "$3" != "1" ]; then
+  exit 0
+fi
+
+SERVER_URL="${OBSERVABILITY_SERVER:-http://localhost:4000}"
+REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null)"
+SESSION_ID="$(echo -n "$REPO_PATH" | shasum -a 256 | cut -c1-36)"
+BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo 'detached')"
+
+PREVIOUS_HEAD="${1:-}"
+NEW_HEAD="${2:-}"
+
+SUMMARY="Checkout: ${BRANCH}"
+
+PAYLOAD="$(jq -n \
+  --arg previous_head "$PREVIOUS_HEAD" \
+  --arg new_head "$NEW_HEAD" \
+  --arg branch "$BRANCH" \
+  --argjson is_branch_checkout true \
+  --arg claude_session_id "${CLAUDE_SESSION_ID:-}" \
+  '{previous_head: $previous_head, new_head: $new_head, branch: $branch, is_branch_checkout: $is_branch_checkout, claude_session_id: $claude_session_id}'
+)"
+
+BODY="$(jq -n \
+  --arg source_app "git" \
+  --arg session_id "$SESSION_ID" \
+  --arg hook_event_type "GitPostCheckout" \
+  --arg summary "$SUMMARY" \
+  --argjson payload "$PAYLOAD" \
+  '{source_app: $source_app, session_id: $session_id, hook_event_type: $hook_event_type, summary: $summary, payload: $payload}'
+)"
+
+curl -s -X POST "${SERVER_URL}/events" \
+  -H "Content-Type: application/json" \
+  -d "$BODY" \
+  --connect-timeout 1 --max-time 2 >/dev/null 2>&1 &
+
+exit 0

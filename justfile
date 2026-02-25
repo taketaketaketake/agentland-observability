@@ -70,6 +70,20 @@ test-event:
       | head -c 200
     @echo ""
 
+# --- Git Hooks ---
+
+setup-githooks:
+    git config core.hooksPath .githooks
+    chmod +x .githooks/*
+    @echo "Git hooks configured (core.hooksPath=.githooks)"
+
+test-git-event:
+    curl -s -X POST http://localhost:{{server_port}}/events \
+      -H "Content-Type: application/json" \
+      -d '{"source_app":"git","session_id":"test-git-00000000000000000000000000","hook_event_type":"GitPostCommit","summary":"Committed: Test commit message (abc1234)","payload":{"branch":"main","commit_hash":"abc1234567890","commit_short":"abc1234","commit_message":"Test commit message","author":"Test User <test@example.com>","changed_file_count":3,"insertions":42,"deletions":7,"claude_session_id":""}}' \
+      | head -c 200
+    @echo ""
+
 # --- Open ---
 
 open:

@@ -25,6 +25,12 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   SessionEnd: 'text-[var(--theme-text-tertiary)] bg-[var(--theme-bg-tertiary)] border-[var(--theme-border-primary)]',
   PermissionRequest: 'text-[#d4a04a] bg-[rgba(212,160,74,0.08)] border-[rgba(212,160,74,0.15)]',
   Notification: 'text-[#6a9fd8] bg-[rgba(106,159,216,0.08)] border-[rgba(106,159,216,0.15)]',
+  GitPreCommit: 'text-[#5ba8a8] bg-[rgba(91,168,168,0.08)] border-[rgba(91,168,168,0.15)]',
+  GitPostCommit: 'text-[#5ba8a8] bg-[rgba(91,168,168,0.08)] border-[rgba(91,168,168,0.15)]',
+  GitPrePush: 'text-[#5ba8a8] bg-[rgba(91,168,168,0.08)] border-[rgba(91,168,168,0.15)]',
+  GitPostCheckout: 'text-[#5ba8a8] bg-[rgba(91,168,168,0.08)] border-[rgba(91,168,168,0.15)]',
+  GitPostMerge: 'text-[#5ba8a8] bg-[rgba(91,168,168,0.08)] border-[rgba(91,168,168,0.15)]',
+  GitPostRewrite: 'text-[#5ba8a8] bg-[rgba(91,168,168,0.08)] border-[rgba(91,168,168,0.15)]',
 };
 
 const DEFAULT_TYPE_COLOR = 'text-[var(--theme-text-secondary)] bg-[var(--theme-bg-tertiary)] border-[var(--theme-border-primary)]';

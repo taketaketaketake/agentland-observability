@@ -1,0 +1,50 @@
+#!/bin/bash
+# Git hook: pre-push → POST GitPrePush event to observability server
+# Receives: $1=remote_name $2=remote_url; stdin has lines of <local_ref> <local_sha> <remote_ref> <remote_sha>
+
+SERVER_URL="${OBSERVABILITY_SERVER:-http://localhost:4000}"
+REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null)"
+SESSION_ID="$(echo -n "$REPO_PATH" | shasum -a 256 | cut -c1-36)"
+BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo 'detached')"
+
+REMOTE_NAME="${1:-origin}"
+REMOTE_URL="${2:-}"
+
+# Count commits being pushed by reading stdin
+COMMIT_COUNT=0
+while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+  if [ "$REMOTE_SHA" = "0000000000000000000000000000000000000000" ]; then
+    # New branch — count all commits
+    COUNT="$(git rev-list --count "$LOCAL_SHA" 2>/dev/null || echo 0)"
+  else
+    COUNT="$(git rev-list --count "${REMOTE_SHA}..${LOCAL_SHA}" 2>/dev/null || echo 0)"
+  fi
+  COMMIT_COUNT=$((COMMIT_COUNT + COUNT))
+done
+
+SUMMARY="Pushing: ${COMMIT_COUNT} commit(s) to ${REMOTE_NAME}/${BRANCH}"
+
+PAYLOAD="$(jq -n \
+  --arg branch "$BRANCH" \
+  --arg remote_name "$REMOTE_NAME" \
+  --arg remote_url "$REMOTE_URL" \
+  --argjson commit_count "$COMMIT_COUNT" \
+  --arg claude_session_id "${CLAUDE_SESSION_ID:-}" \
+  '{branch: $branch, remote_name: $remote_name, remote_url: $remote_url, commit_count: $commit_count, claude_session_id: $claude_session_id}'
+)"
+
+BODY="$(jq -n \
+  --arg source_app "git" \
+  --arg session_id "$SESSION_ID" \
+  --arg hook_event_type "GitPrePush" \
+  --arg summary "$SUMMARY" \
+  --argjson payload "$PAYLOAD" \
+  '{source_app: $source_app, session_id: $session_id, hook_event_type: $hook_event_type, summary: $summary, payload: $payload}'
+)"
+
+curl -s -X POST "${SERVER_URL}/events" \
+  -H "Content-Type: application/json" \
+  -d "$BODY" \
+  --connect-timeout 1 --max-time 2 >/dev/null 2>&1 &
+
+exit 0

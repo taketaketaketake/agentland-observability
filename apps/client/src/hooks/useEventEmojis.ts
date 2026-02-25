@@ -16,6 +16,12 @@ const EVENT_TYPE_EMOJIS: Record<string, string> = {
   ConfigChange: '\u2699\uFE0F', // gear
   WorktreeCreate: '\u{1F333}',  // deciduous tree
   WorktreeRemove: '\u{1FAA5}',  // axe
+  GitPreCommit: '\u{1F4DD}',   // memo
+  GitPostCommit: '\u2705',      // check mark
+  GitPrePush: '\u{1F4E4}',     // outbox tray
+  GitPostCheckout: '\u{1F500}', // shuffle
+  GitPostMerge: '\u{1F91D}',   // handshake
+  GitPostRewrite: '\u{1F504}', // counterclockwise arrows
 };
 
 const TOOL_EMOJIS: Record<string, string> = {

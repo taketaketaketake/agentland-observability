@@ -1,0 +1,43 @@
+#!/bin/bash
+# Git hook: post-rewrite → POST GitPostRewrite event to observability server
+# Receives: $1=rewrite_type ("amend" or "rebase"); stdin has lines of <old_sha> <new_sha>
+
+SERVER_URL="${OBSERVABILITY_SERVER:-http://localhost:4000}"
+REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null)"
+SESSION_ID="$(echo -n "$REPO_PATH" | shasum -a 256 | cut -c1-36)"
+BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo 'detached')"
+
+REWRITE_TYPE="${1:-unknown}"
+
+# Count rewritten commits from stdin
+REWRITTEN_COUNT=0
+while read -r OLD_SHA NEW_SHA REST; do
+  REWRITTEN_COUNT=$((REWRITTEN_COUNT + 1))
+done
+
+LABEL="$(echo "$REWRITE_TYPE" | sed 's/^./\U&/')"
+SUMMARY="${LABEL}: ${REWRITTEN_COUNT} commit(s) rewritten"
+
+PAYLOAD="$(jq -n \
+  --arg branch "$BRANCH" \
+  --arg rewrite_type "$REWRITE_TYPE" \
+  --argjson rewritten_count "$REWRITTEN_COUNT" \
+  --arg claude_session_id "${CLAUDE_SESSION_ID:-}" \
+  '{branch: $branch, rewrite_type: $rewrite_type, rewritten_count: $rewritten_count, claude_session_id: $claude_session_id}'
+)"
+
+BODY="$(jq -n \
+  --arg source_app "git" \
+  --arg session_id "$SESSION_ID" \
+  --arg hook_event_type "GitPostRewrite" \
+  --arg summary "$SUMMARY" \
+  --argjson payload "$PAYLOAD" \
+  '{source_app: $source_app, session_id: $session_id, hook_event_type: $hook_event_type, summary: $summary, payload: $payload}'
+)"
+
+curl -s -X POST "${SERVER_URL}/events" \
+  -H "Content-Type: application/json" \
+  -d "$BODY" \
+  --connect-timeout 1 --max-time 2 >/dev/null 2>&1 &
+
+exit 0

@@ -1,0 +1,43 @@
+#!/bin/bash
+# Git hook: post-merge → POST GitPostMerge event to observability server
+# Receives: $1=squash_flag (1 if squash merge, 0 otherwise)
+
+SERVER_URL="${OBSERVABILITY_SERVER:-http://localhost:4000}"
+REPO_PATH="$(git rev-parse --show-toplevel 2>/dev/null)"
+SESSION_ID="$(echo -n "$REPO_PATH" | shasum -a 256 | cut -c1-36)"
+BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || echo 'detached')"
+
+IS_SQUASH=false
+if [ "$1" = "1" ]; then
+  IS_SQUASH=true
+fi
+
+MERGED_COMMIT="$(git rev-parse HEAD)"
+CHANGED_COUNT="$(git diff-tree --no-commit-id --name-only -r HEAD | grep -c . || echo 0)"
+
+SUMMARY="Merged into ${BRANCH} (${CHANGED_COUNT} files)"
+
+PAYLOAD="$(jq -n \
+  --arg branch "$BRANCH" \
+  --argjson is_squash "$IS_SQUASH" \
+  --arg merged_commit "$MERGED_COMMIT" \
+  --argjson changed_file_count "${CHANGED_COUNT:-0}" \
+  --arg claude_session_id "${CLAUDE_SESSION_ID:-}" \
+  '{branch: $branch, is_squash: $is_squash, merged_commit: $merged_commit, changed_file_count: $changed_file_count, claude_session_id: $claude_session_id}'
+)"
+
+BODY="$(jq -n \
+  --arg source_app "git" \
+  --arg session_id "$SESSION_ID" \
+  --arg hook_event_type "GitPostMerge" \
+  --arg summary "$SUMMARY" \
+  --argjson payload "$PAYLOAD" \
+  '{source_app: $source_app, session_id: $session_id, hook_event_type: $hook_event_type, summary: $summary, payload: $payload}'
+)"
+
+curl -s -X POST "${SERVER_URL}/events" \
+  -H "Content-Type: application/json" \
+  -d "$BODY" \
+  --connect-timeout 1 --max-time 2 >/dev/null 2>&1 &
+
+exit 0
