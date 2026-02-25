@@ -17,7 +17,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `rm -f ${TEST_DB} ${TEST_DB}-wal ${TEST_DB}-shm && TEST_DB=${TEST_DB} SERVER_PORT=${SERVER_PORT} bun run start`,
+      command: `rm -f ${TEST_DB} ${TEST_DB}-wal ${TEST_DB}-shm && TEST_DB=${TEST_DB} SERVER_PORT=${SERVER_PORT} CORS_ORIGIN=http://localhost:${CLIENT_PORT} bun run start`,
       cwd: '../../apps/server',
       port: SERVER_PORT,
       reuseExistingServer: false,

@@ -7,6 +7,7 @@
 
 import json
 import os
+import re
 import sys
 import requests
 
@@ -28,17 +29,26 @@ def main() -> None:
     tool_input = data.get("tool_input", {})
 
     # --- Safety checks ---
-    # Block dangerous rm -rf commands
+    # Block dangerous shell commands
+    DANGEROUS_PATTERNS = [
+        (r"\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--no-preserve-root\s*)(\/(?:\s|$)|~(?:\s|$))", "Blocked dangerous rm command targeting / or ~"),
+        (r"\brm\s+--no-preserve-root\b", "Blocked rm --no-preserve-root"),
+        (r"\bchmod\s+777\s+/", "Blocked chmod 777 on root path"),
+        (r"\bmkfs\b", "Blocked mkfs command"),
+        (r"\bdd\b.*\bof\s*=\s*/dev/", "Blocked dd writing to device"),
+        (r":\(\)\{\s*:\|:&\s*\};:", "Blocked fork bomb"),
+    ]
+
     if tool_name == "Bash":
         command = tool_input.get("command", "")
-        if "rm -rf /" in command or "rm -rf ~" in command:
-            # Deny the tool call
-            result = {
-                "decision": "block",
-                "reason": "Blocked dangerous rm -rf command",
-            }
-            print(json.dumps(result))
-            return
+        for pattern, reason in DANGEROUS_PATTERNS:
+            if re.search(pattern, command):
+                result = {
+                    "decision": "block",
+                    "reason": reason,
+                }
+                print(json.dumps(result))
+                return
 
     # Block .env file access
     if tool_name in ("Read", "Write", "Edit"):

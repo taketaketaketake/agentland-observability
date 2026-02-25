@@ -1,6 +1,20 @@
 import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions } from './db';
 import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage } from './types';
 
+const MAX_EVENT_SIZE = 2 * 1024 * 1024;       // 2 MB
+const MAX_TRANSCRIPT_SIZE = 10 * 1024 * 1024;  // 10 MB
+
+function checkBodySize(req: Request, maxSize: number, headers: Record<string, string>): Response | null {
+  const contentLength = req.headers.get('Content-Length');
+  if (contentLength && parseInt(contentLength) > maxSize) {
+    return new Response(JSON.stringify({ error: `Payload too large (max ${maxSize} bytes)` }), {
+      status: 413,
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    });
+  }
+  return null;
+}
+
 async function sendResponseToAgent(
   wsUrl: string,
   response: HumanInTheLoopResponse
@@ -59,6 +73,8 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
 
   initDatabase(dbPath);
 
+  const corsOrigin = process.env.CORS_ORIGIN || `http://localhost:${process.env.VITE_PORT || '5173'}`;
+
   const wsClients = new Set<any>();
 
   const server = Bun.serve({
@@ -68,7 +84,7 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
       const url = new URL(req.url);
 
       const headers = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': corsOrigin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       };
@@ -79,6 +95,8 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
 
       // POST /events
       if (url.pathname === '/events' && req.method === 'POST') {
+        const sizeError = checkBodySize(req, MAX_EVENT_SIZE, headers);
+        if (sizeError) return sizeError;
         try {
           const event: HookEvent = await req.json();
           if (!event.source_app || !event.session_id || !event.hook_event_type || !event.payload) {
@@ -125,6 +143,8 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
 
       // POST /events/:id/respond
       if (url.pathname.match(/^\/events\/\d+\/respond$/) && req.method === 'POST') {
+        const sizeError = checkBodySize(req, MAX_EVENT_SIZE, headers);
+        if (sizeError) return sizeError;
         const id = parseInt(url.pathname.split('/')[2]);
         try {
           const response: HumanInTheLoopResponse = await req.json();
@@ -162,6 +182,8 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
 
       // POST /transcripts
       if (url.pathname === '/transcripts' && req.method === 'POST') {
+        const sizeError = checkBodySize(req, MAX_TRANSCRIPT_SIZE, headers);
+        if (sizeError) return sizeError;
         try {
           const body = await req.json();
           const messages: TranscriptMessage[] = body.messages;

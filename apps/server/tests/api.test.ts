@@ -167,10 +167,41 @@ describe('GET /transcripts/:session_id', () => {
 });
 
 describe('CORS', () => {
-  test('OPTIONS returns CORS headers', async () => {
+  test('OPTIONS returns CORS headers with configured origin', async () => {
     const res = await fetch(`${baseUrl}/events`, { method: 'OPTIONS' });
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeTruthy();
+    expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
     expect(res.headers.get('Access-Control-Allow-Methods')).toContain('POST');
+  });
+});
+
+describe('Request size limits', () => {
+  test('accepts event within size limit', async () => {
+    const res = await postEvent(validEvent());
+    expect(res.status).toBe(200);
+  });
+
+  test('rejects oversized event payload (>2MB)', async () => {
+    const padding = 'x'.repeat(2 * 1024 * 1024);
+    const oversizedEvent = validEvent({ payload: { data: padding } });
+    const res = await fetch(`${baseUrl}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(oversizedEvent),
+    });
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.error).toContain('Payload too large');
+  });
+
+  test('rejects oversized transcript payload (>10MB)', async () => {
+    const padding = 'x'.repeat(10 * 1024 * 1024);
+    const res = await fetch(`${baseUrl}/transcripts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ data: padding }] }),
+    });
+    expect(res.status).toBe(413);
   });
 });
 
