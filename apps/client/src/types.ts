@@ -62,3 +62,42 @@ export interface ChartDataPoint {
   toolEvents?: Record<string, number>;
   sessions: Record<string, number>;
 }
+
+/* ─── Insights Dashboard Types ─── */
+
+export interface InsightsKPI {
+  totalEvents: number;
+  totalAgents: number;
+  activeAgents: number;
+  avgEventsPerAgent: number;
+  topEventType: string;
+  topTool: string;
+  eventsPerMinute: number;
+  sessionDurationAvgMs: number;
+}
+
+export interface DonutSlice {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface AreaPoint {
+  timestamp: number;
+  value: number;
+}
+
+export interface BarItem {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface InsightsData {
+  kpis: InsightsKPI;
+  eventTypeBreakdown: DonutSlice[];
+  toolUsageBreakdown: DonutSlice[];
+  eventTimeline: AreaPoint[];
+  topToolsRanking: BarItem[];
+  agentActivity: BarItem[];
+}

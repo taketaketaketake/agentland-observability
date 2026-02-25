@@ -10,7 +10,10 @@ import LivePulseChart from './components/LivePulseChart';
 import ToastNotification from './components/ToastNotification';
 import AgentSwimLaneContainer from './components/AgentSwimLaneContainer';
 import AgentStatusPanel from './components/AgentStatusPanel';
+import InsightsPanel from './components/InsightsPanel';
 import { WS_URL } from './config';
+
+type DashboardTab = 'live' | 'insights';
 
 interface Toast {
   id: number;
@@ -31,6 +34,7 @@ export default function App() {
   const [selectedAgentLanes, setSelectedAgentLanes] = useState<string[]>([]);
   const [, setCurrentTimeRange] = useState<TimeRange>('1m');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('live');
 
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -97,6 +101,22 @@ export default function App() {
               <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[var(--theme-accent-success)]' : 'bg-[var(--theme-accent-error)]'}`} />
               {isConnected ? 'LIVE' : 'OFFLINE'}
             </div>
+
+            {/* Tab Switcher */}
+            <div className="flex items-center rounded-md border border-[var(--theme-border-primary)] bg-[var(--theme-bg-primary)] p-0.5">
+              <TabButton active={activeTab === 'live'} onClick={() => setActiveTab('live')}>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Live
+              </TabButton>
+              <TabButton active={activeTab === 'insights'} onClick={() => setActiveTab('insights')}>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Insights
+              </TabButton>
+            </div>
           </div>
 
           {/* Center: Stats */}
@@ -107,26 +127,30 @@ export default function App() {
             <StatPill label="Agents" value={agents.length} color="var(--theme-accent-info)" />
           </div>
 
-          {/* Right: Actions */}
+          {/* Right: Actions (Live-tab controls) */}
           <div className="flex items-center gap-1.5">
-            <HeaderButton
-              onClick={() => setSidebarOpen(v => !v)}
-              active={sidebarOpen}
-              title="Toggle agents panel"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
-              </svg>
-            </HeaderButton>
-            <HeaderButton
-              onClick={() => setShowFilters(v => !v)}
-              active={showFilters}
-              title="Toggle filters"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-            </HeaderButton>
+            {activeTab === 'live' && (
+              <>
+                <HeaderButton
+                  onClick={() => setSidebarOpen(v => !v)}
+                  active={sidebarOpen}
+                  title="Toggle agents panel"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+                  </svg>
+                </HeaderButton>
+                <HeaderButton
+                  onClick={() => setShowFilters(v => !v)}
+                  active={showFilters}
+                  title="Toggle filters"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                </HeaderButton>
+              </>
+            )}
             <HeaderButton onClick={handleClear} title="Clear events">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -136,63 +160,71 @@ export default function App() {
         </div>
       </header>
 
-      {/* ─── Filters Bar ─── */}
-      {showFilters && (
+      {/* ─── Filters Bar (Live tab only) ─── */}
+      {activeTab === 'live' && showFilters && (
         <FilterPanel filters={filters} onFiltersChange={setFilters} />
       )}
 
       {/* ─── Main Content ─── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ─── Sidebar: Agent Panel ─── */}
-        {sidebarOpen && (
+        {/* ─── Sidebar: Agent Panel (Live tab only) ─── */}
+        {activeTab === 'live' && sidebarOpen && (
           <aside className="w-64 mobile:w-56 flex-shrink-0 border-r border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)] flex flex-col overflow-hidden">
             <AgentStatusPanel events={events} onSelectAgent={toggleAgentLane} />
           </aside>
         )}
 
         {/* ─── Main Area ─── */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {/* Chart */}
-          <LivePulseChart
-            events={events}
-            filters={filters}
-            onUpdateUniqueApps={setUniqueAppNames}
-            onUpdateAllApps={setAllAppNames}
-            onUpdateTimeRange={setCurrentTimeRange}
-          />
-
-          {/* Swim Lanes */}
-          {selectedAgentLanes.length > 0 && (
-            <div className="flex-shrink-0 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)] px-4 py-3 mobile:px-3 mobile:py-2 overflow-hidden">
-              <AgentSwimLaneContainer
-                selectedAgents={selectedAgentLanes}
-                events={events}
-                timeRange="1m"
-                onUpdateSelectedAgents={setSelectedAgentLanes}
-              />
-            </div>
-          )}
-
-          {/* Event Feed */}
-          <div className="flex flex-col flex-1 overflow-hidden">
-            <EventTimeline
+        {activeTab === 'live' ? (
+          <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+            {/* Chart */}
+            <LivePulseChart
               events={events}
               filters={filters}
-              uniqueAppNames={uniqueAppNames}
-              allAppNames={allAppNames}
-              stickToBottom={stickToBottom}
-              onStickToBottomChange={setStickToBottom}
-              onSelectAgent={toggleAgentLane}
+              onUpdateUniqueApps={setUniqueAppNames}
+              onUpdateAllApps={setAllAppNames}
+              onUpdateTimeRange={setCurrentTimeRange}
             />
-          </div>
-        </main>
+
+            {/* Swim Lanes */}
+            {selectedAgentLanes.length > 0 && (
+              <div className="flex-shrink-0 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)] px-4 py-3 mobile:px-3 mobile:py-2 overflow-hidden">
+                <AgentSwimLaneContainer
+                  selectedAgents={selectedAgentLanes}
+                  events={events}
+                  timeRange="1m"
+                  onUpdateSelectedAgents={setSelectedAgentLanes}
+                />
+              </div>
+            )}
+
+            {/* Event Feed */}
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <EventTimeline
+                events={events}
+                filters={filters}
+                uniqueAppNames={uniqueAppNames}
+                allAppNames={allAppNames}
+                stickToBottom={stickToBottom}
+                onStickToBottomChange={setStickToBottom}
+                onSelectAgent={toggleAgentLane}
+              />
+            </div>
+          </main>
+        ) : (
+          <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <InsightsPanel events={events} />
+          </main>
+        )}
       </div>
 
-      {/* ─── Floating Controls ─── */}
-      <StickScrollButton
-        stickToBottom={stickToBottom}
-        onToggle={() => setStickToBottom((v) => !v)}
-      />
+      {/* ─── Floating Controls (Live tab only) ─── */}
+      {activeTab === 'live' && (
+        <StickScrollButton
+          stickToBottom={stickToBottom}
+          onToggle={() => setStickToBottom((v) => !v)}
+        />
+      )}
 
       {/* Error bar */}
       {error && (
@@ -229,6 +261,29 @@ function StatPill({ label, value, color }: { label: string; value: number; color
         {value}
       </span>
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono transition-all duration-150 ${
+        active
+          ? 'bg-[var(--theme-primary-glow-strong)] text-[var(--theme-primary)]'
+          : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-secondary)]'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
