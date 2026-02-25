@@ -7,10 +7,26 @@
 import json
 import os
 import sys
+import traceback
 
 import requests
 
 SERVER_URL = os.environ.get("OBSERVABILITY_SERVER_URL", "http://localhost:4000")
+
+LOG_FILE = os.path.expanduser("~/.claude/session_end_hook.log")
+
+
+def log(msg: str) -> None:
+    """Write to both stderr and a persistent log file."""
+    line = f"[session_end] {msg}"
+    print(line, file=sys.stderr)
+    try:
+        with open(LOG_FILE, "a") as f:
+            from datetime import datetime, timezone
+            ts = datetime.now(timezone.utc).isoformat()
+            f.write(f"{ts} {line}\n")
+    except Exception:
+        pass
 
 
 def send_event_inline(data: dict, session_id: str, source_app: str) -> None:
@@ -24,30 +40,63 @@ def send_event_inline(data: dict, session_id: str, source_app: str) -> None:
         "timestamp": None,
     }
     try:
-        requests.post(f"{SERVER_URL}/events", json=event, timeout=2)
-    except Exception:
-        pass
+        resp = requests.post(f"{SERVER_URL}/events", json=event, timeout=2)
+        log(f"SessionEnd event POST: {resp.status_code}")
+    except Exception as e:
+        log(f"SessionEnd event POST failed: {e}")
 
 
-def ingest_transcript(session_id: str, source_app: str, cwd: str) -> None:
+def ingest_transcript(session_id: str, source_app: str, cwd: str, transcript_path: str | None = None) -> None:
     """Read the .jsonl transcript and POST messages to /transcripts."""
-    # Build the path: ~/.claude/projects/-{cwd-with-slashes-replaced}/{session_id}.jsonl
-    cwd_dashed = cwd.replace("/", "-")
-    jsonl_path = os.path.expanduser(f"~/.claude/projects/{cwd_dashed}/{session_id}.jsonl")
+    if transcript_path and os.path.exists(transcript_path):
+        jsonl_path = transcript_path
+        log(f"Using transcript_path from stdin: {jsonl_path}")
+    else:
+        # Fallback: construct the path (Claude replaces both / and _ with -)
+        cwd_dashed = cwd.translate(str.maketrans("/_", "--"))
+        jsonl_path = os.path.expanduser(f"~/.claude/projects/{cwd_dashed}/{session_id}.jsonl")
+        log(f"Constructed transcript path: {jsonl_path}")
+        log(f"  cwd={cwd!r} -> cwd_dashed={cwd_dashed!r}")
+
+    log(f"  session_id={session_id!r}")
 
     if not os.path.exists(jsonl_path):
+        log(f"File NOT FOUND: {jsonl_path}")
+        # List what's actually in the directory to debug
+        parent = os.path.dirname(jsonl_path)
+        if os.path.isdir(parent):
+            files = [f for f in os.listdir(parent) if f.endswith(".jsonl")]
+            log(f"  Directory {parent} has {len(files)} .jsonl files")
+            # Show a few filenames to help debug
+            for f in files[:5]:
+                log(f"    {f}")
+        else:
+            log(f"  Parent directory does not exist: {parent}")
         return
 
+    file_size = os.path.getsize(jsonl_path)
+    log(f"File found: {jsonl_path} ({file_size} bytes)")
+
+    total_lines = 0
+    user_msgs = 0
+    assistant_msgs = 0
+    skipped_no_content = 0
+    parse_errors = 0
     messages = []
+
     try:
         with open(jsonl_path, "r") as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
+                total_lines += 1
                 try:
                     record = json.loads(line)
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    parse_errors += 1
+                    if parse_errors <= 3:
+                        log(f"  JSON parse error on line {total_lines}: {e}")
                     continue
 
                 record_type = record.get("type")
@@ -83,6 +132,7 @@ def ingest_transcript(session_id: str, source_app: str, cwd: str) -> None:
 
                 content = "\n\n".join(text_parts).strip()
                 if not content:
+                    skipped_no_content += 1
                     continue
 
                 thinking = "\n\n".join(thinking_parts).strip() or None
@@ -105,37 +155,57 @@ def ingest_transcript(session_id: str, source_app: str, cwd: str) -> None:
                     message_data["output_tokens"] = usage.get("output_tokens")
 
                 messages.append(message_data)
-    except Exception:
+                if role == "user":
+                    user_msgs += 1
+                else:
+                    assistant_msgs += 1
+
+    except Exception as e:
+        log(f"Error reading transcript: {e}\n{traceback.format_exc()}")
         return
 
+    log(f"Parsed: {total_lines} lines, {user_msgs} user msgs, {assistant_msgs} assistant msgs, {skipped_no_content} skipped (no content), {parse_errors} parse errors")
+
     if not messages:
+        log("No messages to send — skipping POST")
         return
 
     try:
-        requests.post(
+        resp = requests.post(
             f"{SERVER_URL}/transcripts",
             json={"messages": messages},
             timeout=10,
         )
-    except Exception:
-        pass
+        log(f"POST /transcripts: {resp.status_code} — {resp.text[:200]}")
+    except Exception as e:
+        log(f"POST /transcripts failed: {e}")
 
 
 if __name__ == "__main__":
+    log("=== Hook started ===")
     try:
         raw = sys.stdin.read()
         if not raw.strip():
+            log("Empty stdin — exiting")
             sys.exit(0)
         data = json.loads(raw)
-    except (json.JSONDecodeError, Exception):
+        log(f"stdin keys: {list(data.keys())}")
+    except (json.JSONDecodeError, Exception) as e:
+        log(f"Failed to parse stdin: {e}")
         sys.exit(0)
 
     session_id = data.get("session_id", "unknown")
     source_app = os.environ.get("CLAUDE_SOURCE_APP", "claude-code")
     cwd = data.get("cwd", os.getcwd())
+    transcript_path = data.get("transcript_path")
+
+    log(f"session_id={session_id}, source_app={source_app}, cwd={cwd}")
+    log(f"transcript_path={transcript_path!r}")
 
     # 1. Send the SessionEnd event
     send_event_inline(data, session_id, source_app)
 
     # 2. Ingest the transcript
-    ingest_transcript(session_id, source_app, cwd)
+    ingest_transcript(session_id, source_app, cwd, transcript_path)
+
+    log("=== Hook finished ===")
