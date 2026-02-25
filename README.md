@@ -1,10 +1,10 @@
-# Claude Code Observability
+# Multi-Agent Observability
 
-Real-time observability dashboard for multi-agent Claude Code sessions. Captures hook events, streams them over WebSocket, and displays them in a live mission-control UI with agent tracking, transcript viewing, analytics, and LLM-powered evaluation.
+Real-time observability dashboard for multi-agent coding sessions. Supports **Claude Code** and **Gemini CLI**. Captures hook events, streams them over WebSocket, and displays them in a live mission-control UI with agent tracking, transcript viewing, analytics, and LLM-powered evaluation.
 
 ## What This Is
 
-When you run Claude Code, it fires lifecycle hooks (tool use, session start/end, permissions, etc.). This system captures those hooks, stores them in SQLite, and streams them to a React dashboard in real time. You get:
+When you run Claude Code or Gemini CLI, they fire lifecycle hooks (tool use, session start/end, permissions, etc.). This system captures those hooks, stores them in SQLite, and streams them to a React dashboard in real time. Agents from both tools appear side-by-side, identified by `source_app` (`claude-code` or `gemini-cli`) + `session_id`. You get:
 
 - **Live event feed** with per-agent color coding and swim lanes
 - **Agent status panel** showing active/idle/stopped agents
@@ -22,17 +22,19 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
                         │   agent identity)     │
                         └───────────┬───────────┘
                                     │
-                ┌───────────────────┼───────────────────┐
-                │                   │                   │
-    ┌───────────▼──────────┐  ┌────▼──────────┐  ┌─────▼─────────────┐
-    │     README.md        │  │  docs/        │  │  .claude/         │
-    │                      │  │  architecture │  │  hooks/ + settings│
-    │  - Entry point       │  │  .md          │  │                   │
-    │  - Quick start       │  │               │  │  - Hook scripts   │
-    │  - Repo structure    │  │  - Layers     │  │  - Event wiring   │
-    └──────────────────────┘  │  - Data flow  │  │  - Safety gates   │
-                              │  - Schema     │  └───────────────────┘
-                              └───────────────┘
+        ┌───────────────────┬───────┴───────┬───────────────────┐
+        │                   │               │                   │
+┌───────▼──────────┐  ┌────▼──────────┐  ┌─▼────────────────┐  ┌▼──────────────────┐
+│    README.md     │  │  docs/        │  │  .claude/        │  │  .gemini/          │
+│                  │  │  architecture │  │  hooks/ + settings│  │  hooks/ + settings │
+│  - Entry point   │  │  .md          │  │                  │  │                    │
+│  - Quick start   │  │  hook-setup   │  │  - Hook scripts  │  │  - Hook scripts    │
+│  - Repo structure│  │  .md          │  │  - Event wiring  │  │  - Event mapping   │
+└──────────────────┘  │               │  │  - Safety gates  │  │  - Gemini config   │
+                      │  - Layers     │  └──────────────────┘  └────────────────────┘
+                      │  - Data flow  │
+                      │  - Schema     │
+                      └───────────────┘
 ```
 
 ## Repository Structure
@@ -41,24 +43,20 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 .
 ├── .claude/                          # Claude Code hook system
 │   ├── settings.json                 # Hook event → script wiring
-│   └── hooks/                        # Python hook scripts
+│   └── hooks/                        # Python hook scripts (14 events)
 │       ├── send_event.py             # Shared helper: POST event to server
 │       ├── pre_tool_use.py           # Safety gate (blocks rm -rf, .env access)
 │       ├── post_tool_use.py          # Logs tool completion
-│       ├── post_tool_use_failure.py  # Logs tool failures
-│       ├── session_start.py          # Sends SessionStart event
-│       ├── session_end.py            # Sends SessionEnd + ingests transcript JSONL (merges thinking blocks)
-│       ├── stop.py                   # Sends Stop event
-│       ├── subagent_start.py         # Logs subagent spawn
-│       ├── subagent_stop.py          # Logs subagent termination
-│       ├── user_prompt_submit.py     # Logs user prompts
-│       ├── permission_request.py     # Logs permission requests
-│       ├── notification.py           # Logs notifications
-│       ├── config_change.py          # Logs config changes
-│       ├── pre_compact.py            # Logs context compaction
-│       ├── teammate_idle.py          # Logs idle agents
-│       ├── task_completed.py         # Logs task completion
-│       └── validators/               # Additional validation modules
+│       ├── session_end.py            # Sends SessionEnd + ingests transcript JSONL
+│       └── ...                       # session_start, stop, notification, etc.
+│
+├── .gemini/                          # Gemini CLI hook system
+│   ├── settings.json                 # Hook event → script wiring (with matchers)
+│   └── hooks/                        # Python hook scripts (8 events)
+│       ├── send_event.py             # Shared helper (source_app: "gemini-cli")
+│       ├── before_tool.py            # BeforeTool → PreToolUse
+│       ├── after_tool.py             # AfterTool → PostToolUse
+│       └── ...                       # session_start/end, before/after_agent, etc.
 │
 ├── apps/
 │   ├── server/                       # Bun + SQLite backend
@@ -99,7 +97,8 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 │   └── reset-system.sh
 │
 ├── docs/
-│   └── architecture.md               # System architecture specification
+│   ├── architecture.md               # System architecture specification
+│   └── hook-setup.md                 # Hook setup guide for Claude Code + Gemini CLI
 │
 ├── justfile                          # Task runner recipes
 ├── .env.sample                       # Environment variable template
@@ -137,7 +136,11 @@ just client   # http://localhost:5173
 
 ### Configure Hooks
 
-The `.claude/settings.json` is already committed to this repo with portable paths using `$CLAUDE_PROJECT_DIR`. Just clone the repo and ensure `uv` is on your PATH — hooks will resolve automatically. All hook scripts POST events to `http://localhost:4000/events` (configurable via `OBSERVABILITY_SERVER_URL`).
+Hook configurations for both Claude Code (`.claude/settings.json`) and Gemini CLI (`.gemini/settings.json`) are committed to this repo with portable paths. Just clone the repo and ensure `uv` is on your PATH — hooks will resolve automatically.
+
+To add observability to **other projects**, copy the `.claude/hooks/` and/or `.gemini/hooks/` directories plus their `settings.json` files. See [docs/hook-setup.md](docs/hook-setup.md) for detailed instructions.
+
+All hook scripts POST events to `http://localhost:4000/events` (configurable via `OBSERVABILITY_SERVER_URL`).
 
 ### Test
 
@@ -253,7 +256,7 @@ Three tables added to the existing SQLite database:
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Hooks** | Python 3.10+ / uv | Event emission from Claude Code |
+| **Hooks** | Python 3.10+ / uv | Event emission from Claude Code + Gemini CLI |
 | **Server** | Bun + SQLite (WAL) | HTTP + WebSocket server, event storage |
 | **Client** | React 19 + TypeScript + Vite | Dashboard UI |
 | **Styling** | Tailwind CSS v3 | Dark industrial theme |
@@ -283,4 +286,4 @@ EVAL_MODEL=                                   # Override model (default: per-pro
 
 ## Learn More
 
-See [docs/architecture.md](docs/architecture.md) for the full system architecture, data flow, and database schema.
+See [docs/architecture.md](docs/architecture.md) for the full system architecture, data flow, and database schema. See [docs/hook-setup.md](docs/hook-setup.md) for configuring hooks in your projects.

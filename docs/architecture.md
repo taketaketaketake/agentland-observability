@@ -4,7 +4,7 @@
 
 ### Implemented
 
-- Hook system with 16 event types wired via `.claude/settings.json`
+- Hook system with 16 Claude Code event types (`.claude/settings.json`) + 8 Gemini CLI event types (`.gemini/settings.json`)
 - Bun HTTP + WebSocket server with SQLite persistence (WAL mode)
 - React dashboard with four tabs: Live, Insights, Transcripts, Evals
 - Real-time event streaming via WebSocket
@@ -34,26 +34,24 @@
 ## Layers
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Claude Code Agent(s)                        │
-│                     (source_app + session_id)                      │
-└────────────────────────────┬────────────────────────────────────────┘
-                             │  Hook lifecycle events (stdin → Python)
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Hook Scripts                                │
-│                     .claude/hooks/*.py                              │
-│                                                                     │
-│  pre_tool_use ─── safety gate (block rm -rf, .env)                 │
-│  post_tool_use, post_tool_use_failure ─── tool lifecycle           │
-│  session_start, session_end ─── session lifecycle + transcript     │
-│  stop, subagent_start, subagent_stop ─── agent lifecycle           │
-│  user_prompt_submit, permission_request ─── user interaction       │
-│  notification, config_change, pre_compact ─── system events        │
-│  teammate_idle, task_completed ─── coordination events             │
-└────────────────────────────┬────────────────────────────────────────┘
-                             │  HTTP POST /events  (+ POST /transcripts)
-                             ▼
+┌──────────────────────────────────┐  ┌──────────────────────────────────┐
+│       Claude Code Agent(s)       │  │       Gemini CLI Agent(s)        │
+│  (source_app: "claude-code")     │  │  (source_app: "gemini-cli")     │
+└──────────────┬───────────────────┘  └──────────────┬───────────────────┘
+               │                                     │
+               ▼                                     ▼
+┌──────────────────────────────────┐  ┌──────────────────────────────────┐
+│     .claude/hooks/*.py           │  │     .gemini/hooks/*.py           │
+│  14 event types                  │  │  8 event types (mapped)          │
+│  + safety gate + transcripts     │  │  BeforeTool → PreToolUse         │
+│                                  │  │  AfterTool  → PostToolUse        │
+│                                  │  │  BeforeAgent→ UserPromptSubmit   │
+│                                  │  │  AfterAgent → Stop               │
+└──────────────┬───────────────────┘  └──────────────┬───────────────────┘
+               │  HTTP POST /events                  │
+               │  (+ POST /transcripts)              │
+               └──────────────┬──────────────────────┘
+                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      Bun Server (port 4000)                        │
 │                     apps/server/src/index.ts                       │
@@ -122,7 +120,7 @@ Stores all hook events received from agents.
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | INTEGER | Primary key, autoincrement |
-| `source_app` | TEXT NOT NULL | e.g. `claude-code` |
+| `source_app` | TEXT NOT NULL | e.g. `claude-code`, `gemini-cli` |
 | `session_id` | TEXT NOT NULL | UUID identifying the session |
 | `hook_event_type` | TEXT NOT NULL | e.g. `PreToolUse`, `SessionEnd` |
 | `payload` | TEXT NOT NULL | JSON blob with event-specific data |
@@ -143,7 +141,7 @@ Stores transcript messages ingested at session end.
 |--------|------|-------|
 | `id` | INTEGER | Primary key, autoincrement |
 | `session_id` | TEXT NOT NULL | Links to the agent session |
-| `source_app` | TEXT NOT NULL | e.g. `claude-code` |
+| `source_app` | TEXT NOT NULL | e.g. `claude-code`, `gemini-cli` |
 | `role` | TEXT NOT NULL | `user` or `assistant` |
 | `content` | TEXT NOT NULL | Message text |
 | `thinking` | TEXT | Assistant thinking block (optional) |
@@ -227,9 +225,11 @@ Snapshots of metric statistics saved by the regression evaluator for future comp
 
 ```
 1. Agent executes action (e.g. tool call)
-2. Claude Code fires hook (e.g. PreToolUse)
+2. Claude Code or Gemini CLI fires hook (e.g. PreToolUse / BeforeTool)
 3. Hook script reads JSON from stdin
-4. Script extracts session_id, source_app, constructs event payload
+4. Script extracts session_id, sets source_app, constructs event payload
+   - Claude hooks: source_app from $CLAUDE_SOURCE_APP env var
+   - Gemini hooks: source_app hardcoded to "gemini-cli"
 5. HTTP POST → http://localhost:4000/events (2s timeout, fail silently)
 6. Server validates, inserts to SQLite, assigns id + timestamp
 7. Server broadcasts { type: 'event', data } to all WebSocket clients
@@ -340,9 +340,9 @@ Agents are hidden from the sidebar after 10 minutes of inactivity.
 
 ## Hook System
 
-All hooks are Python scripts executed via `uv run --script` with PEP 723 inline metadata for dependency declaration.
+All hooks are Python scripts executed via `uv run --script` with PEP 723 inline metadata for dependency declaration. See [hook-setup.md](hook-setup.md) for configuration instructions.
 
-### Hook Categories
+### Claude Code Hooks (`.claude/hooks/`)
 
 **Self-contained** (no local imports): `pre_tool_use.py`, `post_tool_use.py`
 
@@ -350,10 +350,35 @@ All hooks are Python scripts executed via `uv run --script` with PEP 723 inline 
 
 **Complex**: `session_end.py` handles both the SessionEnd event and transcript JSONL ingestion. It buffers thinking-only JSONL records (entries with only a `thinking` content block) and merges them into the next assistant text response, ensuring thinking blocks are preserved in the messages table.
 
-### Wired Hook Events
+#### Wired Hook Events
 
 All events configured in `.claude/settings.json`:
 
 `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `PermissionRequest`, `Notification`, `Stop`, `SubagentStart`, `SubagentStop`, `PreCompact`, `UserPromptSubmit`, `SessionStart`, `SessionEnd`, `TeammateIdle`, `TaskCompleted`
 
 **Not wired** (scripts exist but not in settings): `worktree_create.py`, `worktree_remove.py`
+
+### Gemini CLI Hooks (`.gemini/hooks/`)
+
+Gemini hooks map Gemini CLI event names to the server's event types for dashboard consistency. All Gemini hook scripts redirect stdout to stderr to prevent stray prints from corrupting Gemini's JSON response parsing.
+
+**Self-contained** (inline event construction): `before_tool.py`, `after_tool.py`
+
+**Use shared helper** (`send_event.py`): All other hooks. The helper hardcodes `source_app = "gemini-cli"` and falls back to `GEMINI_SESSION_ID` env var if `session_id` is missing from stdin.
+
+#### Wired Hook Events
+
+All events configured in `.gemini/settings.json`:
+
+| Gemini Event | Server Event | Notes |
+|---|---|---|
+| `SessionStart` | `SessionStart` | Direct equivalent |
+| `SessionEnd` | `SessionEnd` | Event only (no transcript ingestion) |
+| `BeforeTool` | `PreToolUse` | Regex matcher `.*` for all tools |
+| `AfterTool` | `PostToolUse` | Includes `tool_response` object |
+| `BeforeAgent` | `UserPromptSubmit` | Fires with user prompt |
+| `AfterAgent` | `Stop` | Agent loop completed |
+| `Notification` | `Notification` | Direct equivalent |
+| `PreCompress` | `PreCompact` | Context compression |
+
+**Limitations**: No transcript ingestion (Gemini transcript format unverified). No safety gate (Gemini CLI has its own permission model).
