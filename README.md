@@ -47,7 +47,7 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 │       ├── post_tool_use.py          # Logs tool completion
 │       ├── post_tool_use_failure.py  # Logs tool failures
 │       ├── session_start.py          # Sends SessionStart event
-│       ├── session_end.py            # Sends SessionEnd + ingests transcript JSONL
+│       ├── session_end.py            # Sends SessionEnd + ingests transcript JSONL (merges thinking blocks)
 │       ├── stop.py                   # Sends Stop event
 │       ├── subagent_start.py         # Logs subagent spawn
 │       ├── subagent_stop.py          # Logs subagent termination
@@ -73,7 +73,7 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 │   │           ├── types.ts          # Evaluator interface
 │   │           ├── llmProvider.ts    # Multi-provider LLM abstraction (Anthropic, Gemini)
 │   │           ├── toolSuccess.ts    # Tool success/failure rate (no API key)
-│   │           ├── transcriptQuality.ts  # LLM judge: helpfulness/accuracy/conciseness
+│   │           ├── transcriptQuality.ts  # LLM judge: input quality + response quality (v2)
 │   │           ├── reasoningQuality.ts   # LLM judge: depth/coherence/self-correction
 │   │           └── regression.ts     # Statistical z-score regression detection
 │   │
@@ -162,14 +162,14 @@ The server tests use in-memory SQLite for DB tests and a real server on a random
 
 ## Evaluation System
 
-The Evals tab lets you assess agent quality on-demand. Click "Run" on any evaluator card to score recent activity.
+The Evals tab lets you assess agent quality on-demand. A scope filter bar lets you narrow evaluations by time range, project, and session. Click "Run" on any evaluator card to score the filtered data.
 
 ### Evaluators
 
 | Evaluator | What it measures | LLM provider needed | Cost |
 |-----------|-----------------|---------------------|------|
 | **Tool Success** | Success/failure rate per tool and agent | No | Zero (pure logic) |
-| **Transcript Quality** | Helpfulness, accuracy, conciseness (1-5 each) | Yes | LLM calls |
+| **Transcript Quality** | User input clarity/context + assistant helpfulness/accuracy/conciseness (1-5 each) | Yes | LLM calls |
 | **Reasoning Quality** | Thinking depth, coherence, self-correction (1-5 each) | Yes | LLM calls |
 | **Regression Detection** | Z-score comparison of current vs baseline metrics | No | Zero (statistics) |
 
@@ -185,8 +185,8 @@ User clicks "Run"  →  POST /evaluations/run  →  Server runs evaluator async
 ```
 
 - **Tool success** scans `PostToolUse`/`PostToolUseFailure` events and computes rates grouped by tool name and agent
-- **Transcript quality** uses stratified sampling across sessions, then sends each (user message, assistant response) pair to an LLM judge
-- **Reasoning quality** evaluates thinking blocks with the same stratified sampling approach
+- **Transcript quality** uses stratified sampling across sessions, then sends each (user message, assistant response) pair to an LLM judge that scores both user input quality (clarity, context) and assistant response quality (helpfulness, accuracy, conciseness)
+- **Reasoning quality** evaluates thinking blocks (extracted during transcript ingestion, including merged thinking-only records) with the same stratified sampling approach
 - **Regression** compares a baseline window (7 days ago → 24h ago) against the current window (last 24h) using z-score tests. Flags metrics with z < -2.0 (degraded) or z > 2.0 (improved)
 
 LLM evaluators use `temperature: 0` for deterministic scoring. Prompt versions are tracked so regression detection only compares results from matching prompt versions.
@@ -216,6 +216,18 @@ export EVAL_MODEL=gemini-2.5-pro
 
 The `/evaluations/config` endpoint reports which providers are configured.
 
+### Scope Filters
+
+The filter bar at the top of the Evals tab controls what data each evaluator sees:
+
+| Filter | Options | Effect |
+|--------|---------|--------|
+| **Time Range** | 24 hours, 7 days, 30 days, All time | Sets `time_window_hours` (or omits it for all time) |
+| **Project** | All Projects, or a specific project | Filters events/messages by `cwd` prefix match |
+| **Session** | All Sessions, Last Session, or a specific session | Scopes evaluation to a single session |
+
+Projects are auto-detected from event `payload.cwd` fields, deduplicated by shared git root (e.g. `client/` and `server/` subdirectories merge under the parent project). Sessions display the first user message as a readable label.
+
 ### Evaluation API
 
 | Method | Path | Purpose |
@@ -227,6 +239,7 @@ The `/evaluations/config` endpoint reports which providers are configured.
 | GET | `/evaluations/summary` | Latest stats per evaluator (for KPI cards) |
 | GET | `/evaluations/config` | Available evaluators + API key status |
 | DELETE | `/evaluations/runs/:id` | Delete run + cascade results |
+| GET | `/projects` | List distinct projects (derived from event cwds) |
 
 ### Database tables
 

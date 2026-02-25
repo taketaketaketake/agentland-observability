@@ -12,7 +12,8 @@
 - Session transcript ingestion and viewing
 - Human-in-the-loop question/response flow
 - Insights dashboard with KPIs, donut charts, area charts, bar charts (zero chart deps)
-- LLM evaluation system with 4 evaluators (tool success, transcript quality, reasoning quality, regression detection)
+- LLM evaluation system with 4 evaluators (tool success, transcript quality with user input scoring, reasoning quality, regression detection)
+- Evaluation scope filters (time range, project, session) for targeted evaluation runs
 - Multi-provider LLM support (Anthropic, Gemini) for evaluation judge calls
 - Safety gate in `pre_tool_use.py` blocking dangerous commands
 
@@ -241,9 +242,10 @@ Snapshots of metric statistics saved by the regression evaluator for future comp
 1. Agent session ends → SessionEnd hook fires
 2. session_end.py sends SessionEnd event to /events
 3. session_end.py reads ~/.claude/projects/{cwd-dashed}/{session_id}.jsonl
-4. Parses JSONL → extracts user/assistant messages with thinking blocks
-5. HTTP POST → /transcripts with messages array
-6. Server inserts into messages table (INSERT OR IGNORE by uuid)
+4. Parses JSONL → extracts user/assistant messages
+5. Merges thinking-only records (separate JSONL entries with only thinking content blocks) into the next assistant text response
+6. HTTP POST → /transcripts with messages array (including merged thinking blocks)
+7. Server inserts into messages table (INSERT OR IGNORE by uuid)
 ```
 
 ### Human-in-the-Loop
@@ -265,8 +267,9 @@ Snapshots of metric statistics saved by the regression evaluator for future comp
 | GET | `/events/filter-options` | List distinct source_apps, session_ids, event types |
 | POST | `/events/:id/respond` | Submit HITL response |
 | POST | `/transcripts` | Ingest transcript messages |
-| GET | `/transcripts` | List all transcript sessions with summaries |
+| GET | `/transcripts?project_dir=` | List transcript sessions (optionally filtered by project) |
 | GET | `/transcripts/:session_id` | Get messages for a specific session |
+| GET | `/projects` | List distinct projects derived from event cwds |
 | POST | `/evaluations/run` | Start an evaluation run (returns 202) |
 | GET | `/evaluations/runs` | List runs (filterable by type/status) |
 | GET | `/evaluations/runs/:id` | Single run detail |
@@ -295,7 +298,7 @@ Snapshots of metric statistics saved by the regression evaluator for future comp
 | Live | `EventTimeline` + `AgentStatusPanel` + `LivePulseChart` | Real-time event feed with agent sidebar |
 | Insights | `InsightsPanel` | KPIs, event breakdowns, tool rankings |
 | Transcripts | `TranscriptsListPanel` | Browse and search all session transcripts |
-| Evals | `EvaluationsPanel` | Run evaluations, view scores, drill into results |
+| Evals | `EvaluationsPanel` | Scope filters, run evaluations, view scores, drill into results |
 
 ### Key Components
 
@@ -308,7 +311,7 @@ Snapshots of metric statistics saved by the regression evaluator for future comp
 | `SessionTranscriptPanel` | Slide-out panel showing conversation messages |
 | `FilterPanel` | Dropdown filters for source app, session, event type |
 | `ToastNotification` | Floating alert when a new agent connects |
-| `EvaluationsPanel` | Evals tab: KPI cards, evaluator cards with charts, run history |
+| `EvaluationsPanel` | Evals tab: scope filter bar, KPI cards, evaluator cards with charts, run history |
 | `EvalRunDetailPanel` | Drill-down into individual scored results with rationale |
 | `SuccessRateChart` | Stacked bars showing tool success/failure ratios |
 | `ScoreDistributionChart` | Horizontal bars showing 1-5 score dimensions |
@@ -323,7 +326,7 @@ Snapshots of metric statistics saved by the regression evaluator for future comp
 | `useEventEmojis` | Maps tool names to emoji icons |
 | `useInsightsData` | Aggregates KPIs, builds chart datasets |
 | `useChartData` | Buckets events into time ranges for the pulse chart |
-| `useEvaluations` | Eval state management, run triggers, WebSocket progress |
+| `useEvaluations` | Eval state management, run triggers, WebSocket progress, project/session fetching |
 
 ### Agent Status Logic
 
@@ -345,7 +348,7 @@ All hooks are Python scripts executed via `uv run --script` with PEP 723 inline 
 
 **Use shared helper** (`send_event.py`): All other hooks import `send_event()` after inserting the hooks directory into `sys.path`.
 
-**Complex**: `session_end.py` (211 lines) handles both the SessionEnd event and transcript JSONL ingestion.
+**Complex**: `session_end.py` handles both the SessionEnd event and transcript JSONL ingestion. It buffers thinking-only JSONL records (entries with only a `thinking` content block) and merges them into the next assistant text response, ensuring thinking blocks are preserved in the messages table.
 
 ### Wired Hook Events
 
