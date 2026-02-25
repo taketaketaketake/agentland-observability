@@ -5,10 +5,11 @@ import { getEventSummary } from '../utils/eventSummary';
 export type AgentStatus = 'active' | 'idle' | 'stopped';
 
 export interface AgentInfo {
-  /** source_app:truncated_session_id */
+  /** project_name:truncated_session_id */
   agentId: string;
   sourceApp: string;
   sessionId: string;
+  projectName: string;
   status: AgentStatus;
   lastSummary: string;
   lastEvent: HookEvent;
@@ -28,7 +29,7 @@ export function useAgentStatus(events: HookEvent[]): AgentInfo[] {
     const cutoff = now - VISIBILITY_WINDOW_MS;
 
     // Group events by composite key: source_app + session_id
-    const agentMap = new Map<string, { events: HookEvent[]; sourceApp: string; sessionId: string }>();
+    const agentMap = new Map<string, { events: HookEvent[]; sourceApp: string; sessionId: string; projectName: string }>();
 
     for (const event of events) {
       const truncatedSession = event.session_id.substring(0, 8);
@@ -36,7 +37,10 @@ export function useAgentStatus(events: HookEvent[]): AgentInfo[] {
 
       let entry = agentMap.get(key);
       if (!entry) {
-        entry = { events: [], sourceApp: event.source_app, sessionId: event.session_id };
+        // Derive project name from cwd (last path segment)
+        const cwd = event.payload?.cwd || '';
+        const projectName = cwd ? cwd.replace(/\/+$/, '').split('/').pop() || cwd : '';
+        entry = { events: [], sourceApp: event.source_app, sessionId: event.session_id, projectName };
         agentMap.set(key, entry);
       }
       entry.events.push(event);
@@ -44,7 +48,7 @@ export function useAgentStatus(events: HookEvent[]): AgentInfo[] {
 
     const agents: AgentInfo[] = [];
 
-    for (const [agentId, { events: agentEvents, sourceApp, sessionId }] of agentMap) {
+    for (const [agentId, { events: agentEvents, sourceApp, sessionId, projectName }] of agentMap) {
       // Find the most recent event by timestamp
       let lastEvent = agentEvents[0]!;
       for (const e of agentEvents) {
@@ -69,10 +73,16 @@ export function useAgentStatus(events: HookEvent[]): AgentInfo[] {
         status = 'active';
       }
 
+      // Use project name in display ID if available
+      const displayId = projectName
+        ? `${projectName}:${sessionId.substring(0, 8)}`
+        : agentId;
+
       agents.push({
-        agentId,
+        agentId: displayId,
         sourceApp,
         sessionId,
+        projectName,
         status,
         lastSummary: getEventSummary(lastEvent),
         lastEvent,

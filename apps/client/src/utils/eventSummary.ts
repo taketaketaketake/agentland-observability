@@ -27,13 +27,46 @@ export function getEventSummary(event: HookEvent): string {
 
   // Stop / SubagentStop — show first sentence of last assistant message
   if (type === 'Stop' || type === 'SubagentStop') {
+    if (type === 'SubagentStop' && event.payload?.agent_type) {
+      return `${event.payload.agent_type} agent stopped`;
+    }
     if (lastMsg) return `Completed: ${extractFirstSentence(lastMsg)}`;
     return 'Session completed';
   }
 
   // Session lifecycle
-  if (type === 'SessionStart') return 'Session started';
+  if (type === 'SessionStart') {
+    const model = event.payload?.model || '';
+    return model ? `Session started (${model})` : 'Session started';
+  }
   if (type === 'SessionEnd') return 'Session ended';
+
+  // Notification — show the message
+  if (type === 'Notification') {
+    const message = event.payload?.message;
+    if (message) return message;
+    return 'Notification';
+  }
+
+  // Permission request — show what's being requested
+  if (type === 'PermissionRequest') {
+    const toolName = event.payload?.tool_name || '';
+    const input = event.payload?.tool_input;
+    if (toolName === 'Bash' && input?.command) {
+      return `Requesting: ${toolName} — ${input.command.substring(0, 80)}`;
+    }
+    if (input?.file_path) {
+      return `Requesting: ${toolName} — ${basename(input.file_path)}`;
+    }
+    if (toolName) return `Requesting: ${toolName}`;
+    return 'Permission requested';
+  }
+
+  // Subagent start
+  if (type === 'SubagentStart') {
+    const agentType = event.payload?.agent_type || '';
+    return agentType ? `${agentType} agent started` : 'Subagent started';
+  }
 
   // User prompt
   if (type === 'UserPromptSubmit') {

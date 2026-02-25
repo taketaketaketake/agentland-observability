@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { HookEvent, TimeRange } from '../types';
 import { useEventColors } from '../hooks/useEventColors';
 import { useEventEmojis } from '../hooks/useEventEmojis';
+import { getEventSummary } from '../utils/eventSummary';
 
 interface AgentSwimLaneContainerProps {
   selectedAgents: string[];
@@ -58,7 +59,10 @@ export default function AgentSwimLaneContainer({
         </button>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div
+        className="grid gap-3 pb-2"
+        style={{ gridTemplateColumns: `repeat(${selectedAgents.length}, minmax(0, 1fr))` }}
+      >
         {selectedAgents.map((agent) => {
           const color = getHexColorForApp(agent);
           const agentEvts = agentEvents[agent] || [];
@@ -66,7 +70,7 @@ export default function AgentSwimLaneContainer({
           return (
             <div
               key={agent}
-              className="flex-shrink-0 w-64 rounded-lg border bg-[var(--theme-bg-primary)] overflow-hidden"
+              className="min-w-0 rounded-lg border bg-[var(--theme-bg-primary)] overflow-hidden"
               style={{ borderColor: color, borderTopWidth: 3 }}
             >
               {/* Lane header */}
@@ -101,8 +105,7 @@ export default function AgentSwimLaneContainer({
                     >
                       <span>{getEventEmoji(evt.hook_event_type)}</span>
                       <span className="text-[var(--theme-text-secondary)] truncate">
-                        {evt.hook_event_type}
-                        {evt.payload?.tool_name ? `: ${evt.payload.tool_name}` : ''}
+                        {getEventSummary(evt)}
                       </span>
                     </div>
                   ))
