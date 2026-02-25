@@ -12,7 +12,7 @@ export default function StickScrollButton({ stickToBottom, onToggle }: StickScro
           ? 'bg-[var(--theme-primary)] text-[var(--theme-bg-primary)] border-[var(--theme-primary-dark)] shadow-lg'
           : 'bg-[var(--theme-bg-elevated)] text-[var(--theme-text-tertiary)] border-[var(--theme-border-secondary)] hover:text-[var(--theme-text-secondary)] hover:border-[var(--theme-border-tertiary)]'
       }`}
-      style={stickToBottom ? { boxShadow: '0 0 20px -5px rgba(0, 229, 160, 0.4)' } : {}}
+      style={stickToBottom ? { boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)' } : {}}
       title={stickToBottom ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
     >
       <svg

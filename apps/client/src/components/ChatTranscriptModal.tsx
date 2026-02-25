@@ -7,10 +7,10 @@ interface ChatTranscriptModalProps {
 }
 
 const ROLE_STYLES: Record<string, string> = {
-  user: 'text-[#58a6ff] bg-[rgba(88,166,255,0.1)] border-[rgba(88,166,255,0.2)]',
-  assistant: 'text-[#00e5a0] bg-[rgba(0,229,160,0.1)] border-[rgba(0,229,160,0.2)]',
+  user: 'text-[#6a9fd8] bg-[rgba(106,159,216,0.08)] border-[rgba(106,159,216,0.15)]',
+  assistant: 'text-[#6dba82] bg-[rgba(109,186,130,0.08)] border-[rgba(109,186,130,0.15)]',
   system: 'text-[var(--theme-text-tertiary)] bg-[var(--theme-bg-tertiary)] border-[var(--theme-border-primary)]',
-  tool: 'text-[#bc8cff] bg-[rgba(188,140,255,0.1)] border-[rgba(188,140,255,0.2)]',
+  tool: 'text-[#9b86c4] bg-[rgba(155,134,196,0.08)] border-[rgba(155,134,196,0.15)]',
 };
 
 const DEFAULT_ROLE_STYLE = 'text-[var(--theme-text-secondary)] bg-[var(--theme-bg-tertiary)] border-[var(--theme-border-primary)]';

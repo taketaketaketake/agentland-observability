@@ -10,14 +10,14 @@ interface ChartTheme {
 }
 
 const DEFAULT_THEME: ChartTheme = {
-  primary: '#00e5a0',
-  glow: 'rgba(0, 229, 160, 0.35)',
-  axis: 'rgba(255, 255, 255, 0.06)',
-  text: 'rgba(255, 255, 255, 0.25)',
-  gridLine: 'rgba(255, 255, 255, 0.03)',
+  primary: '#6a9fd8',
+  glow: 'transparent',
+  axis: 'rgba(255, 255, 255, 0.07)',
+  text: 'rgba(255, 255, 255, 0.3)',
+  gridLine: 'rgba(255, 255, 255, 0.04)',
   barColors: [
-    '#00e5a0', '#58a6ff', '#ffb224', '#ff6b6b', '#bc8cff',
-    '#ff9eb7', '#79c0ff', '#56d364', '#f97316', '#06b6d4',
+    '#6a9fd8', '#6dba82', '#d4a04a', '#c96060', '#9b86c4',
+    '#c4889b', '#5ba8a8', '#8bab5e', '#b88c5a', '#7a9eae',
   ],
 };
 
@@ -90,10 +90,10 @@ export class ChartRenderer {
       const eventTypes = Object.entries(point.eventTypes);
       let yOffset = 0;
 
-      // Glow under bars
-      ctx.shadowColor = theme.glow;
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetY = 2;
+      // No glow — matte style
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
 
       if (eventTypes.length <= 1) {
         ctx.fillStyle = theme.primary;

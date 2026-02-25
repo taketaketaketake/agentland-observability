@@ -5,57 +5,57 @@
 @tailwind utilities;
 
 :root {
-  /* Core palette — midnight industrial */
-  --theme-primary: #00e5a0;
-  --theme-primary-hover: #00cc8e;
-  --theme-primary-light: #33edb5;
-  --theme-primary-dark: #00b37d;
-  --theme-primary-glow: rgba(0, 229, 160, 0.15);
-  --theme-primary-glow-strong: rgba(0, 229, 160, 0.3);
+  /* Core palette — matte slate */
+  --theme-primary: #7c9cb5;
+  --theme-primary-hover: #6b8ba4;
+  --theme-primary-light: #93b0c7;
+  --theme-primary-dark: #5f7d94;
+  --theme-primary-glow: rgba(124, 156, 181, 0.1);
+  --theme-primary-glow-strong: rgba(124, 156, 181, 0.18);
 
-  /* Backgrounds — layered darkness */
-  --theme-bg-primary: #0a0e14;
-  --theme-bg-secondary: #0f1419;
-  --theme-bg-tertiary: #151b23;
-  --theme-bg-quaternary: #1c2430;
-  --theme-bg-elevated: #1a2233;
+  /* Backgrounds — warm dark */
+  --theme-bg-primary: #121518;
+  --theme-bg-secondary: #16191d;
+  --theme-bg-tertiary: #1c2025;
+  --theme-bg-quaternary: #23282e;
+  --theme-bg-elevated: #1e2228;
   --theme-bg-surface: rgba(255, 255, 255, 0.03);
 
-  /* Text — cool grays */
-  --theme-text-primary: #e6edf3;
-  --theme-text-secondary: #8b949e;
-  --theme-text-tertiary: #555d67;
-  --theme-text-quaternary: #373e47;
-  --theme-text-accent: #00e5a0;
+  /* Text — high readability */
+  --theme-text-primary: #d4d8de;
+  --theme-text-secondary: #9ba2ab;
+  --theme-text-tertiary: #737a84;
+  --theme-text-quaternary: #4e555e;
+  --theme-text-accent: #7c9cb5;
 
   /* Borders */
-  --theme-border-primary: rgba(255, 255, 255, 0.06);
-  --theme-border-secondary: rgba(255, 255, 255, 0.1);
-  --theme-border-tertiary: rgba(255, 255, 255, 0.15);
-  --theme-border-glow: rgba(0, 229, 160, 0.2);
+  --theme-border-primary: rgba(255, 255, 255, 0.07);
+  --theme-border-secondary: rgba(255, 255, 255, 0.11);
+  --theme-border-tertiary: rgba(255, 255, 255, 0.16);
+  --theme-border-glow: rgba(124, 156, 181, 0.15);
 
-  /* Status colors */
-  --theme-accent-success: #00e5a0;
-  --theme-accent-warning: #ffb224;
-  --theme-accent-error: #ff6b6b;
-  --theme-accent-info: #58a6ff;
+  /* Status colors — desaturated / matte */
+  --theme-accent-success: #6dba82;
+  --theme-accent-warning: #d4a04a;
+  --theme-accent-error: #c96060;
+  --theme-accent-info: #6a9fd8;
 
   /* Shadows & effects */
   --theme-shadow: rgba(0, 0, 0, 0.4);
   --theme-shadow-lg: rgba(0, 0, 0, 0.6);
-  --theme-hover-bg: rgba(0, 229, 160, 0.04);
-  --theme-active-bg: rgba(0, 229, 160, 0.08);
-  --theme-focus-ring: rgba(0, 229, 160, 0.4);
+  --theme-hover-bg: rgba(124, 156, 181, 0.05);
+  --theme-active-bg: rgba(124, 156, 181, 0.09);
+  --theme-focus-ring: rgba(124, 156, 181, 0.35);
 
-  /* Chart colors — neon spectrum */
-  --chart-1: #00e5a0;
-  --chart-2: #58a6ff;
-  --chart-3: #ffb224;
-  --chart-4: #ff6b6b;
-  --chart-5: #bc8cff;
-  --chart-6: #ff9eb7;
-  --chart-7: #79c0ff;
-  --chart-8: #56d364;
+  /* Chart colors — matte tones */
+  --chart-1: #6a9fd8;
+  --chart-2: #6dba82;
+  --chart-3: #d4a04a;
+  --chart-4: #c96060;
+  --chart-5: #9b86c4;
+  --chart-6: #c4889b;
+  --chart-7: #5ba8a8;
+  --chart-8: #8bab5e;
 }
 
 * {
@@ -130,15 +130,15 @@ body::after {
 }
 
 .text-glow {
-  text-shadow: 0 0 10px var(--theme-primary-glow-strong), 0 0 40px var(--theme-primary-glow);
+  text-shadow: none;
 }
 
 .border-glow {
-  box-shadow: 0 0 0 1px var(--theme-border-glow), 0 0 15px -3px var(--theme-primary-glow);
+  box-shadow: 0 0 0 1px var(--theme-border-glow);
 }
 
 .surface-glow {
-  box-shadow: 0 0 0 1px var(--theme-border-glow), 0 0 20px -5px var(--theme-primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 1px var(--theme-border-glow), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 /* Glass morphism surface */
@@ -179,10 +179,10 @@ body::after {
   animation: slide-in-right 0.3s ease-out forwards;
 }
 
-/* Glow ring animation */
+/* Subtle ring animation */
 @keyframes glow-ring {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(0, 229, 160, 0.1), 0 0 8px -2px rgba(0, 229, 160, 0.1); }
-  50% { box-shadow: 0 0 0 1px rgba(0, 229, 160, 0.25), 0 0 15px -2px rgba(0, 229, 160, 0.2); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(124, 156, 181, 0.08); }
+  50% { box-shadow: 0 0 0 1px rgba(124, 156, 181, 0.18); }
 }
 
 .animate-glow-ring {

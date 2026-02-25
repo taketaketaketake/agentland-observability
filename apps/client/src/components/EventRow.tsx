@@ -13,17 +13,17 @@ interface EventRowProps {
 }
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  PreToolUse: 'text-[#58a6ff] bg-[rgba(88,166,255,0.08)] border-[rgba(88,166,255,0.15)]',
-  PostToolUse: 'text-[#00e5a0] bg-[rgba(0,229,160,0.08)] border-[rgba(0,229,160,0.15)]',
-  PostToolUseFailure: 'text-[#ff6b6b] bg-[rgba(255,107,107,0.08)] border-[rgba(255,107,107,0.15)]',
-  Stop: 'text-[#ff6b6b] bg-[rgba(255,107,107,0.06)] border-[rgba(255,107,107,0.12)]',
-  SubagentStart: 'text-[#bc8cff] bg-[rgba(188,140,255,0.08)] border-[rgba(188,140,255,0.15)]',
-  SubagentStop: 'text-[#bc8cff] bg-[rgba(188,140,255,0.06)] border-[rgba(188,140,255,0.12)]',
-  UserPromptSubmit: 'text-[#ffb224] bg-[rgba(255,178,36,0.08)] border-[rgba(255,178,36,0.15)]',
-  SessionStart: 'text-[#56d364] bg-[rgba(86,211,100,0.08)] border-[rgba(86,211,100,0.15)]',
+  PreToolUse: 'text-[#6a9fd8] bg-[rgba(106,159,216,0.08)] border-[rgba(106,159,216,0.15)]',
+  PostToolUse: 'text-[#6dba82] bg-[rgba(109,186,130,0.08)] border-[rgba(109,186,130,0.15)]',
+  PostToolUseFailure: 'text-[#c96060] bg-[rgba(201,96,96,0.08)] border-[rgba(201,96,96,0.15)]',
+  Stop: 'text-[#c96060] bg-[rgba(201,96,96,0.06)] border-[rgba(201,96,96,0.12)]',
+  SubagentStart: 'text-[#9b86c4] bg-[rgba(155,134,196,0.08)] border-[rgba(155,134,196,0.15)]',
+  SubagentStop: 'text-[#9b86c4] bg-[rgba(155,134,196,0.06)] border-[rgba(155,134,196,0.12)]',
+  UserPromptSubmit: 'text-[#d4a04a] bg-[rgba(212,160,74,0.08)] border-[rgba(212,160,74,0.15)]',
+  SessionStart: 'text-[#6dba82] bg-[rgba(109,186,130,0.08)] border-[rgba(109,186,130,0.15)]',
   SessionEnd: 'text-[var(--theme-text-tertiary)] bg-[var(--theme-bg-tertiary)] border-[var(--theme-border-primary)]',
-  PermissionRequest: 'text-[#ffb224] bg-[rgba(255,178,36,0.08)] border-[rgba(255,178,36,0.15)]',
-  Notification: 'text-[#79c0ff] bg-[rgba(121,192,255,0.08)] border-[rgba(121,192,255,0.15)]',
+  PermissionRequest: 'text-[#d4a04a] bg-[rgba(212,160,74,0.08)] border-[rgba(212,160,74,0.15)]',
+  Notification: 'text-[#6a9fd8] bg-[rgba(106,159,216,0.08)] border-[rgba(106,159,216,0.15)]',
 };
 
 const DEFAULT_TYPE_COLOR = 'text-[var(--theme-text-secondary)] bg-[var(--theme-bg-tertiary)] border-[var(--theme-border-primary)]';
@@ -111,7 +111,7 @@ export default function EventRow({ event, index = 0, onSelectAgent }: EventRowPr
 
         {/* Tool name */}
         {toolName && (
-          <span className="flex-shrink-0 flex items-center gap-1 text-[10px] font-mono font-medium text-[var(--theme-accent-info)] bg-[rgba(88,166,255,0.06)] px-1.5 py-0.5 rounded border border-[rgba(88,166,255,0.1)]">
+          <span className="flex-shrink-0 flex items-center gap-1 text-[10px] font-mono font-medium text-[var(--theme-accent-info)] bg-[rgba(106,159,216,0.07)] px-1.5 py-0.5 rounded border border-[rgba(106,159,216,0.12)]">
             <span className="text-xs">{getToolEmoji(toolName)}</span>
             {toolName}
           </span>
@@ -119,7 +119,7 @@ export default function EventRow({ event, index = 0, onSelectAgent }: EventRowPr
 
         {/* Summary */}
         <span
-          className={`flex-1 text-[11px] font-mono text-[var(--theme-text-tertiary)] truncate min-w-0 ${lastAssistantMessage ? 'cursor-pointer hover:text-[var(--theme-text-secondary)]' : ''}`}
+          className={`flex-1 text-[11px] font-mono text-[var(--theme-text-secondary)] truncate min-w-0 ${lastAssistantMessage ? 'cursor-pointer hover:text-[var(--theme-text-primary)]' : ''}`}
           onClick={() => lastAssistantMessage && setShowMessage(!showMessage)}
         >
           {lastAssistantMessage && (
@@ -162,7 +162,7 @@ export default function EventRow({ event, index = 0, onSelectAgent }: EventRowPr
 
       {/* HITL section */}
       {isHITL && (
-        <div className="mx-4 my-2 p-3 rounded-lg border border-[rgba(255,178,36,0.25)] bg-[rgba(255,178,36,0.05)]">
+        <div className="mx-4 my-2 p-3 rounded-lg border border-[rgba(212,160,74,0.2)] bg-[rgba(212,160,74,0.05)]">
           <div className="text-xs font-mono font-medium text-[var(--theme-accent-warning)] mb-2">
             {event.humanInTheLoop?.question}
           </div>
@@ -180,13 +180,13 @@ export default function EventRow({ event, index = 0, onSelectAgent }: EventRowPr
               <button
                 onClick={handleHITLSubmit}
                 disabled={hitlSending || !hitlResponse.trim()}
-                className="text-xs font-mono font-medium px-4 py-1.5 bg-[rgba(255,178,36,0.15)] text-[var(--theme-accent-warning)] border border-[rgba(255,178,36,0.3)] rounded-lg hover:bg-[rgba(255,178,36,0.25)] disabled:opacity-30 transition-colors"
+                className="text-xs font-mono font-medium px-4 py-1.5 bg-[rgba(212,160,74,0.12)] text-[var(--theme-accent-warning)] border border-[rgba(212,160,74,0.25)] rounded-lg hover:bg-[rgba(212,160,74,0.2)] disabled:opacity-30 transition-colors"
               >
                 {hitlSending ? '...' : 'Send'}
               </button>
             </div>
           ) : (
-            <div className="text-xs font-mono text-[var(--theme-accent-success)] bg-[rgba(0,229,160,0.06)] px-3 py-1.5 rounded-lg border border-[rgba(0,229,160,0.15)]">
+            <div className="text-xs font-mono text-[var(--theme-accent-success)] bg-[rgba(109,186,130,0.07)] px-3 py-1.5 rounded-lg border border-[rgba(109,186,130,0.15)]">
               Responded: {event.humanInTheLoopStatus?.response?.response}
             </div>
           )}

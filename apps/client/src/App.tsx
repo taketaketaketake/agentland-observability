@@ -91,8 +91,8 @@ export default function App() {
             {/* Connection indicator */}
             <div className={`flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-full border ${
               isConnected
-                ? 'text-[var(--theme-accent-success)] border-[rgba(0,229,160,0.2)] bg-[rgba(0,229,160,0.05)]'
-                : 'text-[var(--theme-accent-error)] border-[rgba(255,107,107,0.2)] bg-[rgba(255,107,107,0.05)]'
+                ? 'text-[var(--theme-accent-success)] border-[rgba(109,186,130,0.2)] bg-[rgba(109,186,130,0.06)]'
+                : 'text-[var(--theme-accent-error)] border-[rgba(201,96,96,0.2)] bg-[rgba(201,96,96,0.06)]'
             }`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[var(--theme-accent-success)]' : 'bg-[var(--theme-accent-error)]'}`} />
               {isConnected ? 'LIVE' : 'OFFLINE'}

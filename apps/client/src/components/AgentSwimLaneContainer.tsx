@@ -79,7 +79,7 @@ export default function AgentSwimLaneContainer({
                   {agent}
                 </span>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-mono text-[var(--theme-text-quaternary)] tabular-nums">
+                  <span className="text-[10px] font-mono text-[var(--theme-text-tertiary)] tabular-nums">
                     {agentEvts.length}
                   </span>
                   <button
@@ -96,17 +96,17 @@ export default function AgentSwimLaneContainer({
               {/* Lane events */}
               <div className="max-h-28 overflow-y-auto">
                 {agentEvts.length === 0 ? (
-                  <div className="text-center text-[9px] font-mono text-[var(--theme-text-quaternary)] py-3">
+                  <div className="text-center text-[10px] font-mono text-[var(--theme-text-tertiary)] py-3">
                     No events in window
                   </div>
                 ) : (
                   agentEvts.slice(-20).map((evt) => (
                     <div
                       key={evt.id || evt.timestamp}
-                      className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono border-b border-[var(--theme-border-primary)] last:border-b-0 hover:bg-[var(--theme-hover-bg)] transition-colors"
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono border-b border-[var(--theme-border-primary)] last:border-b-0 hover:bg-[var(--theme-hover-bg)] transition-colors"
                     >
-                      <span className="text-xs">{getEventEmoji(evt.hook_event_type)}</span>
-                      <span className="text-[var(--theme-text-tertiary)] truncate">
+                      <span className="text-xs flex-shrink-0">{getEventEmoji(evt.hook_event_type)}</span>
+                      <span className="text-[var(--theme-text-secondary)] truncate">
                         {getEventSummary(evt)}
                       </span>
                     </div>
