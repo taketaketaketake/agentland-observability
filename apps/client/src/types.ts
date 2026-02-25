@@ -75,6 +75,7 @@ export interface TranscriptSessionSummary {
   assistant_count: number;
   first_timestamp: string;
   last_timestamp: string;
+  first_user_message?: string;
 }
 
 /* ─── Evaluation Types ─── */

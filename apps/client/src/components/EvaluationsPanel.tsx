@@ -23,6 +23,18 @@ const EVALUATOR_DESCRIPTIONS: Record<EvaluatorType, string> = {
   regression: 'Statistical comparison of current vs baseline metrics to detect regressions',
 };
 
+function sessionLabel(s: { session_id: string; message_count: number; first_user_message?: string }): string {
+  if (s.first_user_message) {
+    // Strip "Implement the following plan:\n\n# " prefix and take the first meaningful line
+    let label = s.first_user_message.replace(/^Implement the following plan:\s*#?\s*/i, '').trim();
+    // Take first line only
+    label = (label.split('\n')[0] ?? label).trim().replace(/^#+\s*/, '');
+    if (label.length > 60) label = label.substring(0, 57) + '...';
+    return label;
+  }
+  return `${s.session_id.substring(0, 8)}... (${s.message_count} msgs)`;
+}
+
 function formatTimeAgo(ms: number): string {
   const diff = Date.now() - ms;
   if (diff < 60_000) return 'just now';
@@ -235,14 +247,9 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
           className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] appearance-none cursor-pointer"
         >
           <option value="">All Sessions</option>
-          {sessions[0] && (
-            <option value={sessions[0].session_id}>
-              Last Session ({sessions[0].session_id.substring(0, 8)}...)
-            </option>
-          )}
-          {sessions.slice(1).map(s => (
+          {sessions.map((s, i) => (
             <option key={s.session_id} value={s.session_id}>
-              {s.session_id.substring(0, 8)}... ({s.message_count} msgs)
+              {i === 0 ? '(latest) ' : ''}{sessionLabel(s)}
             </option>
           ))}
         </select>

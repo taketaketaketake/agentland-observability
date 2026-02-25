@@ -251,39 +251,43 @@ export function insertMessages(messages: TranscriptMessage[]): number {
 }
 
 export function listTranscriptSessions(projectDir?: string): TranscriptSessionSummary[] {
+  const firstMsgSubquery = `(SELECT substr(m2.content, 1, 120) FROM messages m2 WHERE m2.session_id = m.session_id AND m2.role = 'user' ORDER BY m2.timestamp ASC LIMIT 1)`;
+
   if (projectDir) {
     const stmt = db.prepare(`
       SELECT
-        session_id,
-        source_app,
+        m.session_id,
+        m.source_app,
         COUNT(*) AS message_count,
-        SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) AS user_count,
-        SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) AS assistant_count,
-        MIN(timestamp) AS first_timestamp,
-        MAX(timestamp) AS last_timestamp
-      FROM messages
-      WHERE session_id IN (
+        SUM(CASE WHEN m.role = 'user' THEN 1 ELSE 0 END) AS user_count,
+        SUM(CASE WHEN m.role = 'assistant' THEN 1 ELSE 0 END) AS assistant_count,
+        MIN(m.timestamp) AS first_timestamp,
+        MAX(m.timestamp) AS last_timestamp,
+        ${firstMsgSubquery} AS first_user_message
+      FROM messages m
+      WHERE m.session_id IN (
         SELECT DISTINCT session_id FROM events
         WHERE json_extract(payload, '$.cwd') = ? OR json_extract(payload, '$.cwd') LIKE ? || '/%'
       )
-      GROUP BY session_id
-      ORDER BY MAX(timestamp) DESC
+      GROUP BY m.session_id
+      ORDER BY MAX(m.timestamp) DESC
     `);
     return stmt.all(projectDir, projectDir) as TranscriptSessionSummary[];
   }
 
   const stmt = db.prepare(`
     SELECT
-      session_id,
-      source_app,
+      m.session_id,
+      m.source_app,
       COUNT(*) AS message_count,
-      SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) AS user_count,
-      SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) AS assistant_count,
-      MIN(timestamp) AS first_timestamp,
-      MAX(timestamp) AS last_timestamp
-    FROM messages
-    GROUP BY session_id
-    ORDER BY MAX(timestamp) DESC
+      SUM(CASE WHEN m.role = 'user' THEN 1 ELSE 0 END) AS user_count,
+      SUM(CASE WHEN m.role = 'assistant' THEN 1 ELSE 0 END) AS assistant_count,
+      MIN(m.timestamp) AS first_timestamp,
+      MAX(m.timestamp) AS last_timestamp,
+      ${firstMsgSubquery} AS first_user_message
+    FROM messages m
+    GROUP BY m.session_id
+    ORDER BY MAX(m.timestamp) DESC
   `);
 
   return stmt.all() as TranscriptSessionSummary[];
