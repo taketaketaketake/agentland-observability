@@ -84,6 +84,12 @@ test-git-event:
       | head -c 200
     @echo ""
 
+# --- Hooks ---
+
+# Install observability hooks into a target project
+setup-hooks *args:
+    {{project_root}}/scripts/setup-hooks.sh {{args}}
+
 # --- Open ---
 
 open:

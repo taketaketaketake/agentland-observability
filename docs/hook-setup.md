@@ -13,9 +13,39 @@ Both Claude Code and Gemini CLI support **hooks** — shell commands that run at
 
 The server identifies agents by `source_app` + `session_id`. Claude Code events arrive with `source_app: "claude-code"`, Gemini CLI events with `source_app: "gemini-cli"`. Both appear side-by-side on the dashboard.
 
+## Automated Setup (Recommended)
+
+The fastest way to add observability hooks to any project:
+
+```bash
+# From your target project directory:
+/path/to/claude-observability/scripts/setup-hooks.sh
+
+# Or specify the target explicitly:
+/path/to/claude-observability/scripts/setup-hooks.sh /path/to/your-project
+
+# Or use just (from the observability repo):
+just setup-hooks /path/to/your-project
+```
+
+The script will:
+- Ask which tools to set up (Claude Code, Gemini CLI, or both)
+- Copy hook scripts to the target project
+- Merge `settings.json` non-destructively (preserving existing settings)
+- Send a test event to verify the server is reachable
+
+**Non-interactive flags** (for CI or scripting):
+- `--claude` — Install Claude Code hooks only
+- `--gemini` — Install Gemini CLI hooks only
+- `--all` — Install both without prompting
+
+## Manual Setup
+
+If you prefer to set up hooks manually, or need to customize the configuration:
+
 ## Claude Code
 
-### Option A: Copy the hooks directory (recommended for other projects)
+### Option A: Copy the hooks directory
 
 1. Copy the `.claude/hooks/` directory from this repo into your project:
 

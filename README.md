@@ -137,7 +137,22 @@ just client   # http://localhost:5173
 
 Hook configurations for both Claude Code (`.claude/settings.json`) and Gemini CLI (`.gemini/settings.json`) are committed to this repo with portable paths. Just clone the repo and ensure `uv` is on your PATH — hooks will resolve automatically.
 
-To add observability to **other projects**, copy the `.claude/hooks/` and/or `.gemini/hooks/` directories plus their `settings.json` files. See [docs/hook-setup.md](docs/hook-setup.md) for detailed instructions.
+To add observability to **other projects**, run the setup script from your target project:
+
+```bash
+cd /path/to/your-project
+/path/to/claude-observability/scripts/setup-hooks.sh
+
+# Or with just (from this repo):
+just setup-hooks /path/to/your-project
+
+# Non-interactive (for CI):
+scripts/setup-hooks.sh /path/to/your-project --all
+scripts/setup-hooks.sh /path/to/your-project --claude
+scripts/setup-hooks.sh /path/to/your-project --gemini
+```
+
+The script copies hook scripts and merges `settings.json` non-destructively (preserving existing settings). See [docs/hook-setup.md](docs/hook-setup.md) for manual setup and details.
 
 All hook scripts POST events to `http://localhost:4000/events` (configurable via `OBSERVABILITY_SERVER_URL`).
 
