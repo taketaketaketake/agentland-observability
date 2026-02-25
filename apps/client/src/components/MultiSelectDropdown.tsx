@@ -77,7 +77,7 @@ export default function MultiSelectDropdown({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-72 max-h-64 overflow-y-auto rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] shadow-lg">
+        <div className="absolute z-50 mt-1 w-96 max-h-64 overflow-y-auto rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] shadow-lg">
           {/* Select All / Clear controls */}
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--theme-border-primary)]">
             <button
@@ -114,7 +114,7 @@ export default function MultiSelectDropdown({
                   onChange={() => toggle(option.value)}
                   className="w-3 h-3 rounded border-[var(--theme-border-secondary)] accent-[var(--theme-primary)]"
                 />
-                <span className="text-[11px] font-mono text-[var(--theme-text-secondary)] truncate">
+                <span className="text-[11px] font-mono text-[var(--theme-text-secondary)]">
                   {option.label}
                 </span>
               </label>

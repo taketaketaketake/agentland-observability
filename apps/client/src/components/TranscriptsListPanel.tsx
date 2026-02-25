@@ -26,6 +26,7 @@ export default function TranscriptsListPanel({ onViewTranscript }: TranscriptsLi
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
+  const [analysisSummaries, setAnalysisSummaries] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     setLoading(true);
@@ -44,11 +45,19 @@ export default function TranscriptsListPanel({ onViewTranscript }: TranscriptsLi
         setLoading(false);
       });
 
-    // Fetch analyzed session IDs
+    // Fetch analyzed session IDs and their summaries
     fetch(`${API_URL}/session-analysis?status=completed&limit=200`)
       .then(r => r.ok ? r.json() : [])
       .then((analyses: any[]) => {
         setAnalyzedIds(new Set(analyses.map(a => a.session_id)));
+        const summaryMap = new Map<string, string>();
+        for (const a of analyses) {
+          const json = typeof a.analysis_json === 'string' ? JSON.parse(a.analysis_json) : a.analysis_json;
+          if (json?.task_summary) {
+            summaryMap.set(a.session_id, json.task_summary);
+          }
+        }
+        setAnalysisSummaries(summaryMap);
       })
       .catch(() => {});
   }, []);
@@ -159,6 +168,11 @@ export default function TranscriptsListPanel({ onViewTranscript }: TranscriptsLi
                 <span className="text-[var(--theme-primary)]">{session.assistant_count} assistant</span>
                 <span className="ml-auto">{formatTime(session.first_timestamp)} — {formatTime(session.last_timestamp)}</span>
               </div>
+              {analysisSummaries.has(session.session_id) && (
+                <div className="mt-1.5 text-[10px] font-mono text-[var(--theme-text-primary)] line-clamp-2 leading-relaxed">
+                  {analysisSummaries.get(session.session_id)}
+                </div>
+              )}
             </button>
           ))
         )}
