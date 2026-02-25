@@ -1,4 +1,4 @@
-# Multi-Agent Observability System (React)
+# AgentLand Observability System (React)
 # Usage: just <recipe>
 
 set dotenv-load

@@ -3,7 +3,7 @@ set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "Starting Multi-Agent Observability System..."
+echo "Starting AgentLand Observability System..."
 
 # Auto-backup database before starting
 DB_PATH="$PROJECT_ROOT/apps/server/events.db"

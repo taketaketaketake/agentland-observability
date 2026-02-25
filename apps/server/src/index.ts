@@ -516,7 +516,7 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
         if (success) return undefined;
       }
 
-      return new Response('Multi-Agent Observability Server', {
+      return new Response('AgentLand Observability Server', {
         headers: { ...headers, 'Content-Type': 'text/plain' },
       });
     },

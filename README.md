@@ -1,4 +1,4 @@
-# Multi-Agent Observability
+# AgentLand Observability
 
 Real-time observability dashboard for multi-agent coding sessions. Supports **Claude Code** and **Gemini CLI**. Captures hook events, streams them over WebSocket, and displays them in a live mission-control UI with agent tracking, transcript viewing, analytics, and LLM-powered evaluation.
 
@@ -141,7 +141,7 @@ To add observability to **other projects**, run the setup script from your targe
 
 ```bash
 cd /path/to/your-project
-/path/to/claude-observability/scripts/setup-hooks.sh
+/path/to/agentland-observability/scripts/setup-hooks.sh
 
 # Or with just (from this repo):
 just setup-hooks /path/to/your-project

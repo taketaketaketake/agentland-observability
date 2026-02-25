@@ -1,4 +1,4 @@
-# Claude Code Multi Agent Observability
+# AgentLand Observability
 
 ## Instructions
 > Follow these instructions as you work through the project.

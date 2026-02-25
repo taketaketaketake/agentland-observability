@@ -9,7 +9,7 @@ set -euo pipefail
 #   scripts/setup-hooks.sh [target-dir] [--claude|--gemini|--all]
 #
 # Examples:
-#   cd my-project && /path/to/claude-observability/scripts/setup-hooks.sh
+#   cd my-project && /path/to/agentland-observability/scripts/setup-hooks.sh
 #   scripts/setup-hooks.sh /path/to/my-project --all
 #   scripts/setup-hooks.sh ~/projects/app --claude
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ if [[ "$TARGET_DIR" == "$SOURCE_DIR" ]]; then
 fi
 
 echo ""
-echo -e "${BOLD}Multi-Agent Observability — Hook Setup${NC}"
+echo -e "${BOLD}AgentLand Observability — Hook Setup${NC}"
 echo -e "Source: ${BLUE}${SOURCE_DIR}${NC}"
 echo -e "Target: ${BLUE}${TARGET_DIR}${NC}"
 echo ""

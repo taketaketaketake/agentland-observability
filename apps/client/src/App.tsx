@@ -96,7 +96,7 @@ export default function App() {
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 rounded-full bg-[var(--theme-primary)] animate-live-blink" />
               <h1 className="text-sm font-semibold tracking-tight text-[var(--theme-text-primary)]" style={{ fontFamily: "'Outfit', sans-serif" }}>
-                OBSERVABILITY
+                AGENTLAND
               </h1>
             </div>
 

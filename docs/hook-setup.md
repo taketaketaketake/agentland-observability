@@ -19,10 +19,10 @@ The fastest way to add observability hooks to any project:
 
 ```bash
 # From your target project directory:
-/path/to/claude-observability/scripts/setup-hooks.sh
+/path/to/agentland-observability/scripts/setup-hooks.sh
 
 # Or specify the target explicitly:
-/path/to/claude-observability/scripts/setup-hooks.sh /path/to/your-project
+/path/to/agentland-observability/scripts/setup-hooks.sh /path/to/your-project
 
 # Or use just (from the observability repo):
 just setup-hooks /path/to/your-project
@@ -50,13 +50,13 @@ If you prefer to set up hooks manually, or need to customize the configuration:
 1. Copy the `.claude/hooks/` directory from this repo into your project:
 
 ```bash
-cp -r /path/to/claude-observability/.claude/hooks/ /path/to/your-project/.claude/hooks/
+cp -r /path/to/agentland-observability/.claude/hooks/ /path/to/your-project/.claude/hooks/
 ```
 
 2. Copy the settings file:
 
 ```bash
-cp /path/to/claude-observability/.claude/settings.json /path/to/your-project/.claude/settings.json
+cp /path/to/agentland-observability/.claude/settings.json /path/to/your-project/.claude/settings.json
 ```
 
 If your project already has a `.claude/settings.json`, merge the `"hooks"` key into it.
@@ -64,7 +64,7 @@ If your project already has a `.claude/settings.json`, merge the `"hooks"` key i
 ### Option B: Symlink (for development)
 
 ```bash
-ln -s /path/to/claude-observability/.claude/hooks /path/to/your-project/.claude/hooks
+ln -s /path/to/agentland-observability/.claude/hooks /path/to/your-project/.claude/hooks
 ```
 
 ### Configuration format
@@ -117,13 +117,13 @@ Claude Code hooks are configured in `.claude/settings.json`:
 1. Copy the `.gemini/hooks/` directory from this repo into your project:
 
 ```bash
-cp -r /path/to/claude-observability/.gemini/hooks/ /path/to/your-project/.gemini/hooks/
+cp -r /path/to/agentland-observability/.gemini/hooks/ /path/to/your-project/.gemini/hooks/
 ```
 
 2. Copy the settings file:
 
 ```bash
-cp /path/to/claude-observability/.gemini/settings.json /path/to/your-project/.gemini/settings.json
+cp /path/to/agentland-observability/.gemini/settings.json /path/to/your-project/.gemini/settings.json
 ```
 
 If your project already has a `.gemini/settings.json`, merge the `"hooks"` key into it.
@@ -187,14 +187,14 @@ export OBSERVABILITY_SERVER_URL=http://192.168.1.100:4000
 1. Start the observability server:
 
 ```bash
-cd /path/to/claude-observability
+cd /path/to/agentland-observability
 cd apps/server && bun run dev
 ```
 
 2. Start the dashboard:
 
 ```bash
-cd /path/to/claude-observability
+cd /path/to/agentland-observability
 cd apps/client && bun run dev
 ```
 

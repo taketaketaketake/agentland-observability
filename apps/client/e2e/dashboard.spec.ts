@@ -4,7 +4,7 @@ test('dashboard loads with LIVE indicator and stats', async ({ page }) => {
   await page.goto('/');
 
   // Header renders with logo text
-  await expect(page.locator('text=OBSERVABILITY')).toBeVisible();
+  await expect(page.locator('text=AGENTLAND')).toBeVisible();
 
   // LIVE connection badge appears (exact match to avoid "Live" tab button)
   await expect(page.getByText('LIVE', { exact: true })).toBeVisible({ timeout: 10_000 });
