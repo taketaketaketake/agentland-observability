@@ -18,10 +18,10 @@ test('seed transcript, navigate to Transcripts tab, open session', async ({ page
 
   // Session should be visible in the list (truncated to 8 chars)
   const truncated = sessionId.substring(0, 8);
-  await expect(page.getByText(truncated)).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(truncated).first()).toBeVisible({ timeout: 5_000 });
 
   // Click on the session to open the slide-out panel
-  await page.getByText(truncated).click();
+  await page.getByText(truncated).first().click();
 
   // Slide-out should show the messages
   await expect(page.getByText('Hello from e2e test')).toBeVisible({ timeout: 5_000 });
