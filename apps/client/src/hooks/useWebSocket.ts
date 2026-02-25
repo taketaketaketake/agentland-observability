@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { HookEvent, WebSocketMessage } from '../types';
+import type { HookEvent, WebSocketMessage, EvalProgress } from '../types';
 import { MAX_EVENTS } from '../config';
 
 export function useWebSocket(url: string) {
@@ -8,6 +8,11 @@ export function useWebSocket(url: string) {
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const evalProgressCallbackRef = useRef<((progress: EvalProgress) => void) | null>(null);
+
+  const onEvaluationProgress = useCallback((callback: (progress: EvalProgress) => void) => {
+    evalProgressCallbackRef.current = callback;
+  }, []);
 
   const connect = useCallback(() => {
     try {
@@ -29,12 +34,18 @@ export function useWebSocket(url: string) {
           } else if (message.type === 'event') {
             const newEvent = message.data as HookEvent;
             setEvents(prev => {
+              if (newEvent.id && prev.some(e => e.id === newEvent.id)) {
+                return prev;
+              }
               const next = [...prev, newEvent];
               if (next.length > MAX_EVENTS) {
                 return next.slice(next.length - MAX_EVENTS + 10);
               }
               return next;
             });
+          } else if ((message as any).type === 'evaluation_progress') {
+            const progress = (message as any).data as EvalProgress;
+            evalProgressCallbackRef.current?.(progress);
           }
         } catch (err) {
           console.error('Failed to parse WebSocket message:', err);
@@ -77,5 +88,5 @@ export function useWebSocket(url: string) {
     setEvents([]);
   }, []);
 
-  return { events, isConnected, error, clearEvents };
+  return { events, isConnected, error, clearEvents, onEvaluationProgress };
 }

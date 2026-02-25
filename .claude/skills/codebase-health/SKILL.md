@@ -1,3 +1,8 @@
+---
+name: health
+description: Perform a structured codebase health assessment and append results to docs/health-log.md
+---
+
 # Skill: codebase_health
 
 ## Purpose

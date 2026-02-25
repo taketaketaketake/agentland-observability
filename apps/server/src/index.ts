@@ -1,5 +1,7 @@
 import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions } from './db';
-import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage } from './types';
+import { createEvalRun, getEvalRun, listEvalRuns, updateEvalRunStatus, deleteEvalRun, insertEvalResults, getEvalResults, getEvalSummary } from './evaluations';
+import { runEvaluation } from './evaluationRunner';
+import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage, EvalRunRequest, EvalConfig } from './types';
 
 const MAX_EVENT_SIZE = 2 * 1024 * 1024;       // 2 MB
 const MAX_TRANSCRIPT_SIZE = 10 * 1024 * 1024;  // 10 MB
@@ -230,6 +232,160 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
         const messages = getSessionMessages(sessionId);
         console.log(`[transcripts] GET /transcripts/${sessionId.substring(0, 8)}… — ${messages.length} messages`);
         return new Response(JSON.stringify(messages), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // ─── Evaluation Endpoints ───
+
+      // POST /evaluations/run — start an evaluation
+      if (url.pathname === '/evaluations/run' && req.method === 'POST') {
+        const sizeError = checkBodySize(req, MAX_EVENT_SIZE, headers);
+        if (sizeError) return sizeError;
+        try {
+          const body: EvalRunRequest = await req.json();
+          if (!body.evaluator_type || !body.scope?.type) {
+            return new Response(JSON.stringify({ error: 'evaluator_type and scope.type required' }), {
+              status: 400,
+              headers: { ...headers, 'Content-Type': 'application/json' },
+            });
+          }
+
+          const validTypes = ['tool_success', 'transcript_quality', 'reasoning_quality', 'regression'];
+          if (!validTypes.includes(body.evaluator_type)) {
+            return new Response(JSON.stringify({ error: `Invalid evaluator_type. Must be one of: ${validTypes.join(', ')}` }), {
+              status: 400,
+              headers: { ...headers, 'Content-Type': 'application/json' },
+            });
+          }
+
+          const run = createEvalRun({
+            evaluator_type: body.evaluator_type,
+            scope_type: body.scope.type,
+            scope_session_id: body.scope.session_id ?? null,
+            scope_source_app: body.scope.source_app ?? null,
+            status: 'pending',
+            progress_current: 0,
+            progress_total: 0,
+            summary_json: null,
+            error_message: null,
+            model_name: null,
+            prompt_version: null,
+            options_json: body.options ?? null,
+            created_at: Date.now(),
+            started_at: null,
+            completed_at: null,
+          });
+
+          // Run async — broadcast progress over WebSocket
+          const broadcastProgress = (runId: number, status: string, current: number, total: number) => {
+            const msg = JSON.stringify({
+              type: 'evaluation_progress',
+              data: { run_id: runId, status, progress_current: current, progress_total: total },
+            });
+            wsClients.forEach(client => {
+              try { client.send(msg); } catch (_) { wsClients.delete(client); }
+            });
+          };
+
+          runEvaluation(run, body.scope, body.options ?? {}, broadcastProgress).catch(err => {
+            console.error(`[evaluations] Run ${run.id} failed:`, err);
+          });
+
+          return new Response(JSON.stringify(run), {
+            status: 202,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({ error: 'Invalid request' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      // GET /evaluations/config
+      if (url.pathname === '/evaluations/config' && req.method === 'GET') {
+        const apiKeyConfigured = !!process.env.ANTHROPIC_API_KEY;
+        const available: string[] = ['tool_success'];
+        if (apiKeyConfigured) {
+          available.push('transcript_quality', 'reasoning_quality');
+        }
+        available.push('regression');
+
+        const config: EvalConfig = {
+          api_key_configured: apiKeyConfigured,
+          available_evaluators: available as any,
+        };
+        return new Response(JSON.stringify(config), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /evaluations/summary
+      if (url.pathname === '/evaluations/summary' && req.method === 'GET') {
+        const summary = getEvalSummary();
+        return new Response(JSON.stringify(summary), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /evaluations/runs
+      if (url.pathname === '/evaluations/runs' && req.method === 'GET') {
+        const limit = parseInt(url.searchParams.get('limit') || '50');
+        const evaluator_type = url.searchParams.get('evaluator_type') || undefined;
+        const status = url.searchParams.get('status') || undefined;
+        const runs = listEvalRuns({ limit, evaluator_type, status });
+        return new Response(JSON.stringify(runs), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /evaluations/runs/:id
+      if (url.pathname.match(/^\/evaluations\/runs\/\d+$/) && req.method === 'GET') {
+        const id = parseInt(url.pathname.split('/')[3]);
+        const run = getEvalRun(id);
+        if (!run) {
+          return new Response(JSON.stringify({ error: 'Run not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify(run), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /evaluations/runs/:id/results
+      if (url.pathname.match(/^\/evaluations\/runs\/\d+\/results$/) && req.method === 'GET') {
+        const id = parseInt(url.pathname.split('/')[3]);
+        const run = getEvalRun(id);
+        if (!run) {
+          return new Response(JSON.stringify({ error: 'Run not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        }
+        const limit = parseInt(url.searchParams.get('limit') || '100');
+        const offset = parseInt(url.searchParams.get('offset') || '0');
+        const include_rationale = url.searchParams.get('include_rationale') !== 'false';
+        const results = getEvalResults(id, { limit, offset, include_rationale });
+        return new Response(JSON.stringify(results), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // DELETE /evaluations/runs/:id
+      if (url.pathname.match(/^\/evaluations\/runs\/\d+$/) && req.method === 'DELETE') {
+        const id = parseInt(url.pathname.split('/')[3]);
+        const deleted = deleteEvalRun(id);
+        if (!deleted) {
+          return new Response(JSON.stringify({ error: 'Run not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ deleted: true }), {
           headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }

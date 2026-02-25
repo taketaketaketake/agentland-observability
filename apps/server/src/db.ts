@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import type { HookEvent, FilterOptions, TranscriptMessage, TranscriptSessionSummary } from './types';
+import type { HookEvent, FilterOptions, TranscriptMessage, TranscriptSessionSummary, EvalRun, EvalResult, EvalBaseline, EvalRunStatus } from './types';
 
 let db: Database;
 
@@ -49,6 +49,71 @@ export function initDatabase(dbPath: string = 'events.db'): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_uuid ON messages(uuid)');
+
+  // ─── Evaluation Tables ───
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS evaluation_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      evaluator_type TEXT NOT NULL,
+      scope_type TEXT NOT NULL,
+      scope_session_id TEXT,
+      scope_source_app TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      progress_current INTEGER DEFAULT 0,
+      progress_total INTEGER DEFAULT 0,
+      summary_json TEXT,
+      error_message TEXT,
+      model_name TEXT,
+      prompt_version TEXT,
+      options_json TEXT,
+      created_at INTEGER NOT NULL,
+      started_at INTEGER,
+      completed_at INTEGER
+    )
+  `);
+
+  db.exec('CREATE INDEX IF NOT EXISTS idx_eval_runs_type ON evaluation_runs(evaluator_type)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_eval_runs_status ON evaluation_runs(status)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_eval_runs_created ON evaluation_runs(created_at)');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS evaluation_results (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL,
+      session_id TEXT NOT NULL,
+      source_app TEXT NOT NULL,
+      item_type TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      numeric_score REAL NOT NULL,
+      scores_json TEXT NOT NULL,
+      rationale TEXT,
+      metadata_json TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  db.exec('CREATE INDEX IF NOT EXISTS idx_eval_results_run ON evaluation_results(run_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_eval_results_session ON evaluation_results(session_id)');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS evaluation_baselines (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      evaluator_type TEXT NOT NULL,
+      metric_name TEXT NOT NULL,
+      model_name TEXT,
+      prompt_version TEXT,
+      window_start INTEGER NOT NULL,
+      window_end INTEGER NOT NULL,
+      sample_count INTEGER NOT NULL,
+      mean_score REAL NOT NULL,
+      stddev_score REAL NOT NULL,
+      percentile_json TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  db.exec('CREATE INDEX IF NOT EXISTS idx_eval_baselines_type ON evaluation_baselines(evaluator_type)');
 }
 
 export function insertEvent(event: HookEvent): HookEvent {

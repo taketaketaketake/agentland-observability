@@ -1,6 +1,6 @@
 # Claude Code Observability
 
-Real-time observability dashboard for multi-agent Claude Code sessions. Captures hook events, streams them over WebSocket, and displays them in a live mission-control UI with agent tracking, transcript viewing, and analytics.
+Real-time observability dashboard for multi-agent Claude Code sessions. Captures hook events, streams them over WebSocket, and displays them in a live mission-control UI with agent tracking, transcript viewing, analytics, and LLM-powered evaluation.
 
 ## What This Is
 
@@ -11,6 +11,7 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 - **Session transcripts** ingested at session end, viewable from multiple entry points
 - **Human-in-the-loop support** for responding to agent questions from the dashboard
 - **Insights dashboard** with KPIs, event breakdowns, and tool usage charts
+- **LLM evaluation system** for scoring agent quality across tool success, transcript quality, reasoning quality, and regression detection
 
 ## Documentation Relationship Map
 
@@ -65,17 +66,32 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 │   │   └── src/
 │   │       ├── index.ts              # HTTP routes + WebSocket server
 │   │       ├── db.ts                 # SQLite schema, queries, WAL mode
-│   │       └── types.ts              # Shared TypeScript interfaces
+│   │       ├── types.ts              # Shared TypeScript interfaces
+│   │       ├── evaluations.ts        # Evaluation CRUD (runs, results, baselines)
+│   │       ├── evaluationRunner.ts   # Evaluator orchestration + progress broadcast
+│   │       └── evaluators/           # Pluggable evaluator modules
+│   │           ├── types.ts          # Evaluator interface
+│   │           ├── anthropicClient.ts # Claude API wrapper for LLM-as-judge
+│   │           ├── toolSuccess.ts    # Tool success/failure rate (no API key)
+│   │           ├── transcriptQuality.ts  # LLM judge: helpfulness/accuracy/conciseness
+│   │           ├── reasoningQuality.ts   # LLM judge: depth/coherence/self-correction
+│   │           └── regression.ts     # Statistical z-score regression detection
 │   │
 │   └── client/                       # React 19 + Vite + Tailwind dashboard
 │       ├── e2e/                      # Playwright browser tests
 │       ├── playwright.config.ts      # Playwright config (ports 4444/5174)
 │       └── src/
-│           ├── App.tsx               # Main layout (Live / Insights / Transcripts tabs)
+│           ├── App.tsx               # Main layout (Live / Insights / Transcripts / Evals)
 │           ├── config.ts             # WS_URL, API_URL, MAX_EVENTS
 │           ├── types.ts              # Client-side TypeScript interfaces
 │           ├── components/           # UI components
+│           │   ├── EvaluationsPanel.tsx     # Evals tab: KPIs, evaluator cards, run history
+│           │   ├── EvalRunDetailPanel.tsx   # Drill-down into scored results + rationale
+│           │   └── charts/
+│           │       ├── SuccessRateChart.tsx       # Stacked bars for tool success/failure
+│           │       └── ScoreDistributionChart.tsx # Horizontal bars for 1-5 score dimensions
 │           ├── hooks/                # Custom React hooks
+│           │   └── useEvaluations.ts # Eval state management + WebSocket progress
 │           └── utils/                # Event summaries, chart helpers
 │
 ├── scripts/                          # System start/stop scripts
@@ -144,6 +160,57 @@ just open
 
 The server tests use in-memory SQLite for DB tests and a real server on a random port for API tests. The Playwright tests spin up dedicated server (port 4444) and client (port 5174) instances with a temporary DB to avoid collisions with dev servers.
 
+## Evaluation System
+
+The Evals tab lets you assess agent quality on-demand. Click "Run" on any evaluator card to score recent activity.
+
+### Evaluators
+
+| Evaluator | What it measures | API key needed | Cost |
+|-----------|-----------------|----------------|------|
+| **Tool Success** | Success/failure rate per tool and agent | No | Zero (pure logic) |
+| **Transcript Quality** | Helpfulness, accuracy, conciseness (1-5 each) | Yes | LLM calls |
+| **Reasoning Quality** | Thinking depth, coherence, self-correction (1-5 each) | Yes | LLM calls |
+| **Regression Detection** | Z-score comparison of current vs baseline metrics | No | Zero (statistics) |
+
+### How it works
+
+```
+User clicks "Run"  →  POST /evaluations/run  →  Server runs evaluator async
+                                                  │
+                   WebSocket progress ◄────────────┤
+                   (real-time bar updates)         │
+                                                   ▼
+                   Results stored in SQLite  →  GET /evaluations/runs/:id/results
+```
+
+- **Tool success** scans `PostToolUse`/`PostToolUseFailure` events and computes rates grouped by tool name and agent
+- **Transcript quality** uses stratified sampling across sessions, then sends each (user message, assistant response) pair to Claude as a judge
+- **Reasoning quality** evaluates thinking blocks with the same stratified sampling approach
+- **Regression** compares a baseline window (7 days ago → 24h ago) against the current window (last 24h) using z-score tests. Flags metrics with z < -2.0 (degraded) or z > 2.0 (improved)
+
+LLM evaluators use `temperature: 0` for deterministic scoring. Prompt versions are tracked so regression detection only compares results from matching prompt versions.
+
+### Evaluation API
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/evaluations/run` | Start an evaluation (returns 202) |
+| GET | `/evaluations/runs` | List runs (filterable by type/status) |
+| GET | `/evaluations/runs/:id` | Single run detail |
+| GET | `/evaluations/runs/:id/results` | Paginated scored results |
+| GET | `/evaluations/summary` | Latest stats per evaluator (for KPI cards) |
+| GET | `/evaluations/config` | Available evaluators + API key status |
+| DELETE | `/evaluations/runs/:id` | Delete run + cascade results |
+
+### Database tables
+
+Three tables added to the existing SQLite database:
+
+- **`evaluation_runs`** — run metadata: evaluator type, scope, status, progress, summary, model/prompt version for reproducibility
+- **`evaluation_results`** — individual scored items with `numeric_score` (denormalized for fast aggregation), dimension scores in `scores_json`, and optional LLM rationale
+- **`evaluation_baselines`** — snapshots of metric statistics saved when regression detection runs, used for future comparisons
+
 ## Stack
 
 | Layer | Technology | Purpose |
@@ -154,18 +221,24 @@ The server tests use in-memory SQLite for DB tests and a real server on a random
 | **Styling** | Tailwind CSS v3 | Dark industrial theme |
 | **Charts** | SVG (zero deps) | Data visualization |
 | **Transport** | WebSocket | Real-time event streaming |
+| **Evaluations** | Claude API (Sonnet) | LLM-as-judge for quality scoring |
 | **Server Tests** | Bun test | DB + API + WebSocket integration tests |
 | **E2E Tests** | Playwright (Chromium) | Browser tests for dashboard, events, transcripts |
 
 ## Environment Variables
 
 ```bash
+# Core
 SERVER_PORT=4000                              # Server HTTP/WS port
 CLIENT_PORT=5173                              # Vite dev server port
 OBSERVABILITY_SERVER_URL=http://localhost:4000 # Hook target URL
 VITE_WS_URL=ws://localhost:4000/stream        # Client WebSocket URL
 VITE_API_URL=http://localhost:4000            # Client API URL
 VITE_MAX_EVENTS_TO_DISPLAY=300                # Max events in UI buffer
+
+# Evaluations (optional)
+ANTHROPIC_API_KEY=sk-...                      # Required for LLM-as-judge evaluators
+EVAL_MODEL=claude-sonnet-4-20250514           # Judge model (default: claude-sonnet-4-20250514)
 ```
 
 ## Learn More
