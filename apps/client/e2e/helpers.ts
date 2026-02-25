@@ -32,3 +32,24 @@ export async function postTestTranscript(sessionId: string, messages: Array<{ ro
   });
   return res.json();
 }
+
+export async function getRecentEvents(limit = 300): Promise<any[]> {
+  const res = await fetch(`${SERVER_URL}/events/recent?limit=${limit}`);
+  return res.json();
+}
+
+export async function getFilterOptions(): Promise<{ source_apps: string[]; session_ids: string[]; hook_event_types: string[] }> {
+  const res = await fetch(`${SERVER_URL}/events/filter-options`);
+  return res.json();
+}
+
+export async function getTranscriptSessions(): Promise<any[]> {
+  const res = await fetch(`${SERVER_URL}/transcripts`);
+  return res.json();
+}
+
+/** Wait for the LIVE badge to appear — reusable across tests */
+export async function waitForLive(page: import('@playwright/test').Page) {
+  await page.goto('/');
+  await page.getByText('LIVE', { exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+}

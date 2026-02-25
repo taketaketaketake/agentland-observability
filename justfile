@@ -243,6 +243,62 @@ test:
 test-e2e:
     cd {{project_root}}/apps/client && bunx playwright test
 
+# Run e2e tests and append results to docs/e2e-test-log.md
+test-e2e-log:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    log="{{project_root}}/docs/e2e-test-log.md"
+    ts=$(date '+%Y-%m-%d %H:%M')
+    commit=$(git -C "{{project_root}}" rev-parse --short HEAD 2>/dev/null || echo "uncommitted")
+    # Run tests, capture output and exit code
+    set +e
+    output=$(cd "{{project_root}}/apps/client" && bunx playwright test 2>&1)
+    exit_code=$?
+    set -e
+    # Parse results from the last summary line
+    passed=$(echo "$output" | grep -oE '[0-9]+ passed' | head -1 || echo "0 passed")
+    failed=$(echo "$output" | grep -oE '[0-9]+ failed' | head -1 || echo "")
+    duration=$(echo "$output" | grep -oE '\([0-9.]+s\)' | tail -1 || echo "")
+    if [[ $exit_code -eq 0 ]]; then
+      status="PASS"
+    else
+      status="FAIL"
+    fi
+    # Count test files
+    test_files=$(ls "{{project_root}}/apps/client/e2e/"*.spec.ts 2>/dev/null | wc -l | tr -d ' ')
+    # Build result line
+    result="| ${ts} | \`${commit}\` | **${status}** | ${passed}${failed:+, ${failed}} | ${test_files} files | ${duration} |"
+    # Create file with header if it doesn't exist
+    if [[ ! -f "$log" ]]; then
+      cat > "$log" << 'HEADER'
+    # E2E Test Log
+
+    Results from `just test-e2e-log`. Each row is one full Playwright run.
+
+    | Date | Commit | Status | Results | Specs | Duration |
+    |------|--------|--------|---------|-------|----------|
+    HEADER
+      # Strip leading whitespace from heredoc
+      sed -i '' 's/^    //' "$log"
+    fi
+    # Append result
+    echo "$result" >> "$log"
+    # Print summary
+    echo ""
+    echo "=== E2E Test Result ==="
+    echo "  Status:   ${status}"
+    echo "  Results:  ${passed}${failed:+, ${failed}}"
+    echo "  Specs:    ${test_files} files"
+    echo "  Duration: ${duration}"
+    echo "  Logged:   docs/e2e-test-log.md"
+    echo ""
+    # Show failures if any
+    if [[ $exit_code -ne 0 ]]; then
+      echo "--- Failures ---"
+      echo "$output" | grep -A 5 '^\s*[0-9]*) ' || true
+      exit 1
+    fi
+
 test-all: test test-e2e
 
 test-event:
