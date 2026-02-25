@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEvaluations } from '../hooks/useEvaluations';
-import type { EvaluatorType, EvalRun, EvalSummary, EvalProgress } from '../types';
+import type { EvaluatorType, EvalRun, EvalSummary, EvalProgress, ProviderInfo } from '../types';
 import SuccessRateChart from './charts/SuccessRateChart';
 import ScoreDistributionChart from './charts/ScoreDistributionChart';
 import EvalRunDetailPanel from './EvalRunDetailPanel';
@@ -51,6 +51,7 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
 
   const [detailRunId, setDetailRunId] = useState<number | null>(null);
   const [runningButtons, setRunningButtons] = useState<Set<EvaluatorType>>(new Set());
+  const [selectedProviders, setSelectedProviders] = useState<Record<string, string>>({});
 
   // Wire up WebSocket progress
   useEffect(() => {
@@ -62,7 +63,8 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
   const handleRun = useCallback(async (type: EvaluatorType) => {
     if (runningButtons.has(type)) return;
     setRunningButtons(prev => new Set(prev).add(type));
-    await startEvaluation(type, { type: 'global' }, { time_window_hours: 24 });
+    const provider = selectedProviders[type] || undefined;
+    await startEvaluation(type, { type: 'global' }, { time_window_hours: 24, provider });
     // Debounce: prevent re-run for 2 seconds
     setTimeout(() => {
       setRunningButtons(prev => {
@@ -71,7 +73,7 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
         return next;
       });
     }, 2000);
-  }, [startEvaluation, runningButtons]);
+  }, [startEvaluation, runningButtons, selectedProviders]);
 
   const handleViewDetail = useCallback(async (runId: number) => {
     setDetailRunId(runId);
@@ -95,6 +97,9 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
     return config?.available_evaluators.includes(type) ?? false;
   };
 
+  const configuredProviders: ProviderInfo[] = (config?.providers ?? []).filter(p => p.configured);
+  const isLlmEvaluator = (type: EvaluatorType) => type === 'transcript_quality' || type === 'reasoning_quality';
+
   if (detailRunId && selectedRun) {
     return (
       <EvalRunDetailPanel
@@ -117,7 +122,7 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
           <span className="text-xs font-mono text-[var(--theme-accent-warning)]">
-            Set ANTHROPIC_API_KEY or GOOGLE_API_KEY for LLM evaluations (transcript quality, reasoning quality). Tool success works without it.
+            Set your preferred LLM provider API key for LLM evaluations (transcript quality, reasoning quality). Tool success works without it.
           </span>
         </div>
       )}
@@ -195,6 +200,9 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
           running={runningButtons.has('transcript_quality')}
           loading={loading}
           onRun={() => handleRun('transcript_quality')}
+          providerOptions={isLlmEvaluator('transcript_quality') ? configuredProviders : undefined}
+          selectedProvider={selectedProviders['transcript_quality'] ?? ''}
+          onProviderChange={(v) => setSelectedProviders(prev => ({ ...prev, transcript_quality: v }))}
         >
           {getSummary('transcript_quality')?.summary && (
             <ScoreDistributionChart
@@ -217,6 +225,9 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
           running={runningButtons.has('reasoning_quality')}
           loading={loading}
           onRun={() => handleRun('reasoning_quality')}
+          providerOptions={isLlmEvaluator('reasoning_quality') ? configuredProviders : undefined}
+          selectedProvider={selectedProviders['reasoning_quality'] ?? ''}
+          onProviderChange={(v) => setSelectedProviders(prev => ({ ...prev, reasoning_quality: v }))}
         >
           {getSummary('reasoning_quality')?.summary && (
             <ScoreDistributionChart
@@ -315,6 +326,9 @@ function EvaluatorCard({
   running,
   loading,
   onRun,
+  providerOptions,
+  selectedProvider,
+  onProviderChange,
   children,
 }: {
   type: EvaluatorType;
@@ -324,6 +338,9 @@ function EvaluatorCard({
   running: boolean;
   loading: boolean;
   onRun: () => void;
+  providerOptions?: ProviderInfo[];
+  selectedProvider?: string;
+  onProviderChange?: (provider: string) => void;
   children?: React.ReactNode;
 }) {
   const isRunning = progress?.status === 'running' || running;
@@ -342,19 +359,36 @@ function EvaluatorCard({
             {EVALUATOR_DESCRIPTIONS[type]}
           </p>
         </div>
-        <button
-          onClick={onRun}
-          disabled={!available || isRunning || loading}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-mono transition-all duration-150 ${
-            !available
-              ? 'text-[var(--theme-text-quaternary)] border border-[var(--theme-border-primary)] cursor-not-allowed opacity-50'
-              : isRunning
-                ? 'text-[var(--theme-accent-warning)] border border-[rgba(212,160,74,0.3)] bg-[rgba(212,160,74,0.06)] cursor-wait'
-                : 'text-[var(--theme-primary)] border border-[var(--theme-border-glow)] bg-[var(--theme-primary-glow)] hover:bg-[var(--theme-primary-glow-strong)]'
-          }`}
-        >
-          {isRunning ? 'Running...' : !available ? 'Unavailable' : 'Run'}
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {providerOptions && providerOptions.length > 0 && (
+            <select
+              value={selectedProvider ?? ''}
+              onChange={(e) => onProviderChange?.(e.target.value)}
+              disabled={isRunning || loading}
+              className="px-2 py-1.5 rounded-md text-[11px] font-mono bg-[var(--theme-bg-primary)] text-[var(--theme-text-secondary)] border border-[var(--theme-border-primary)] outline-none focus:border-[var(--theme-border-glow)] transition-colors disabled:opacity-50"
+            >
+              <option value="">Auto</option>
+              {providerOptions.map(p => (
+                <option key={p.name} value={p.name}>
+                  {p.name} ({p.defaultModel})
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={onRun}
+            disabled={!available || isRunning || loading}
+            className={`px-3 py-1.5 rounded-md text-xs font-mono transition-all duration-150 ${
+              !available
+                ? 'text-[var(--theme-text-quaternary)] border border-[var(--theme-border-primary)] cursor-not-allowed opacity-50'
+                : isRunning
+                  ? 'text-[var(--theme-accent-warning)] border border-[rgba(212,160,74,0.3)] bg-[rgba(212,160,74,0.06)] cursor-wait'
+                  : 'text-[var(--theme-primary)] border border-[var(--theme-border-glow)] bg-[var(--theme-primary-glow)] hover:bg-[var(--theme-primary-glow-strong)]'
+            }`}
+          >
+            {isRunning ? 'Running...' : !available ? 'Unavailable' : 'Run'}
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}

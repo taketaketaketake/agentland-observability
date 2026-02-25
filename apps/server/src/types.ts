@@ -84,6 +84,7 @@ export interface EvalRunOptions {
   sample_limit?: number;
   temperature?: number;
   max_tokens?: number;
+  provider?: string;
 }
 
 export interface EvalRunRequest {
@@ -151,8 +152,15 @@ export interface EvalSummary {
   summary: any | null;
 }
 
+export interface ProviderInfo {
+  name: string;
+  configured: boolean;
+  defaultModel: string;
+}
+
 export interface EvalConfig {
   api_key_configured: boolean;
   available_evaluators: EvaluatorType[];
   configured_providers?: string[];
+  providers: ProviderInfo[];
 }

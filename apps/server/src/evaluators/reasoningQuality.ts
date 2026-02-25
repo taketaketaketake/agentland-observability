@@ -98,7 +98,7 @@ export const reasoningQualityEvaluator: Evaluator = {
             content: `## User Request\n${truncatedUser}\n\n## Thinking/Reasoning Block\n${truncatedThinking}\n\n## Final Response\n${truncatedResponse}`,
           }],
           maxTokens: 512,
-        });
+        }, ctx.options.provider);
 
         const { parsed, error } = parseJudgeResponse(response.text);
 
@@ -176,7 +176,7 @@ export const reasoningQualityEvaluator: Evaluator = {
     return {
       results,
       summary,
-      model_name: getEvalModel(),
+      model_name: getEvalModel(ctx.options.provider),
       prompt_version: REASONING_QUALITY_PROMPT_VERSION,
     };
   },

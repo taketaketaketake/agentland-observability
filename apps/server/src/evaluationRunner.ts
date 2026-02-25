@@ -36,7 +36,7 @@ export async function runEvaluation(
   // Check LLM provider requirement
   if (evaluator.requiresApiKey && !isAnyProviderConfigured()) {
     updateEvalRunStatus(run.id, 'failed', {
-      error_message: `${run.evaluator_type} requires an LLM provider. Set ANTHROPIC_API_KEY or GOOGLE_API_KEY.`,
+      error_message: `${run.evaluator_type} requires an LLM provider. Set an API key for your preferred LLM provider.`,
       completed_at: Date.now(),
     });
     broadcastProgress(run.id, 'failed', 0, 0);

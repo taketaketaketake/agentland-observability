@@ -99,7 +99,7 @@ export const transcriptQualityEvaluator: Evaluator = {
             content: `## User Message\n${truncatedUser}\n\n## Assistant Response\n${truncatedAssistant}`,
           }],
           maxTokens: 512,
-        });
+        }, ctx.options.provider);
 
         const { parsed, error } = parseJudgeResponse(response.text);
 
@@ -179,7 +179,7 @@ export const transcriptQualityEvaluator: Evaluator = {
     return {
       results,
       summary,
-      model_name: getEvalModel(),
+      model_name: getEvalModel(ctx.options.provider),
       prompt_version: TRANSCRIPT_QUALITY_PROMPT_VERSION,
     };
   },

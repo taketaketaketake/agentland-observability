@@ -30,9 +30,16 @@ export interface LLMCallResult {
 
 export interface LLMProvider {
   name: string;
+  defaultModel: string;
   isConfigured(): boolean;
   call(opts: LLMCallOpts): Promise<LLMCallResult>;
   getModel(): string;
+}
+
+export interface ProviderInfo {
+  name: string;
+  configured: boolean;
+  defaultModel: string;
 }
 
 // ─── Anthropic Provider ───
@@ -42,6 +49,7 @@ const ANTHROPIC_DEFAULT_MODEL = 'claude-sonnet-4-20250514';
 
 const anthropicProvider: LLMProvider = {
   name: 'anthropic',
+  defaultModel: ANTHROPIC_DEFAULT_MODEL,
 
   isConfigured() {
     return !!process.env.ANTHROPIC_API_KEY;
@@ -95,6 +103,7 @@ const GEMINI_DEFAULT_MODEL = 'gemini-2.5-flash';
 
 const geminiProvider: LLMProvider = {
   name: 'gemini',
+  defaultModel: GEMINI_DEFAULT_MODEL,
 
   isConfigured() {
     return !!process.env.GOOGLE_API_KEY;
@@ -164,16 +173,60 @@ const providers: Record<string, LLMProvider> = {
 };
 
 /**
- * Returns the active provider based on EVAL_PROVIDER env var.
+ * Register a new LLM provider. It will automatically appear in
+ * getProviderList() and the config endpoint / UI dropdown.
+ *
+ * Example — adding an OpenAI-compatible local model (Ollama, LM Studio):
+ *
+ *   const ollamaProvider: LLMProvider = {
+ *     name: 'ollama',
+ *     defaultModel: 'llama3',
+ *     isConfigured: () => !!process.env.OLLAMA_BASE_URL,
+ *     getModel: () => process.env.OLLAMA_MODEL || 'llama3',
+ *     async call(opts) {
+ *       const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+ *       const model = this.getModel();
+ *       const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+ *         method: 'POST',
+ *         headers: { 'Content-Type': 'application/json' },
+ *         body: JSON.stringify({
+ *           model,
+ *           max_tokens: opts.maxTokens ?? 1024,
+ *           temperature: opts.temperature ?? 0,
+ *           messages: [
+ *             { role: 'system', content: opts.system },
+ *             ...opts.messages,
+ *           ],
+ *         }),
+ *       });
+ *       if (!response.ok) throw new Error(`Ollama API error ${response.status}`);
+ *       const data = await response.json() as any;
+ *       return {
+ *         text: data.choices?.[0]?.message?.content || '',
+ *         model,
+ *         provider: 'ollama',
+ *         inputTokens: data.usage?.prompt_tokens || 0,
+ *         outputTokens: data.usage?.completion_tokens || 0,
+ *       };
+ *     },
+ *   };
+ *   registerProvider(ollamaProvider);
+ */
+export function registerProvider(provider: LLMProvider): void {
+  providers[provider.name] = provider;
+}
+
+/**
+ * Returns the active provider based on EVAL_PROVIDER env var or an explicit name.
  * If not set, auto-detects: picks the first provider that has a key configured.
  * Throws if no provider is available.
  */
-export function getProvider(): LLMProvider {
-  const explicit = process.env.EVAL_PROVIDER;
+export function getProvider(providerName?: string): LLMProvider {
+  const explicit = providerName || process.env.EVAL_PROVIDER;
   if (explicit) {
     const provider = providers[explicit];
-    if (!provider) throw new Error(`Unknown EVAL_PROVIDER: ${explicit}. Available: ${Object.keys(providers).join(', ')}`);
-    if (!provider.isConfigured()) throw new Error(`EVAL_PROVIDER=${explicit} but its API key is not set`);
+    if (!provider) throw new Error(`Unknown provider: ${explicit}. Available: ${Object.keys(providers).join(', ')}`);
+    if (!provider.isConfigured()) throw new Error(`Provider "${explicit}" is not configured (missing API key / env var)`);
     return provider;
   }
 
@@ -182,7 +235,7 @@ export function getProvider(): LLMProvider {
     if (provider.isConfigured()) return provider;
   }
 
-  throw new Error('No LLM provider configured. Set ANTHROPIC_API_KEY or GOOGLE_API_KEY.');
+  throw new Error('No LLM provider configured. Set an API key for your preferred LLM provider.');
 }
 
 /**
@@ -199,16 +252,31 @@ export function getConfiguredProviders(): string[] {
   return Object.values(providers).filter(p => p.isConfigured()).map(p => p.name);
 }
 
+/**
+ * Returns provider info for the UI: name, configured status, and default model.
+ */
+export function getProviderList(): ProviderInfo[] {
+  return Object.values(providers).map(p => ({
+    name: p.name,
+    configured: p.isConfigured(),
+    defaultModel: p.defaultModel,
+  }));
+}
+
 // ─── Convenience: callLLM + parseJudgeResponse ───
 
-export async function callLLM(opts: LLMCallOpts): Promise<LLMCallResult> {
-  const provider = getProvider();
+/**
+ * Call an LLM provider. When providerName is set, that specific provider is used
+ * instead of auto-detect / EVAL_PROVIDER.
+ */
+export async function callLLM(opts: LLMCallOpts, providerName?: string): Promise<LLMCallResult> {
+  const provider = getProvider(providerName);
   return provider.call(opts);
 }
 
-export function getEvalModel(): string {
+export function getEvalModel(providerName?: string): string {
   try {
-    return getProvider().getModel();
+    return getProvider(providerName).getModel();
   } catch {
     return process.env.EVAL_MODEL || ANTHROPIC_DEFAULT_MODEL;
   }

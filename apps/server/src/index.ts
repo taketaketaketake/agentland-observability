@@ -1,7 +1,7 @@
 import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions } from './db';
 import { createEvalRun, getEvalRun, listEvalRuns, updateEvalRunStatus, deleteEvalRun, insertEvalResults, getEvalResults, getEvalSummary } from './evaluations';
 import { runEvaluation } from './evaluationRunner';
-import { isAnyProviderConfigured, getConfiguredProviders } from './evaluators/llmProvider';
+import { isAnyProviderConfigured, getConfiguredProviders, getProviderList } from './evaluators/llmProvider';
 import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage, EvalRunRequest, EvalConfig } from './types';
 
 const MAX_EVENT_SIZE = 2 * 1024 * 1024;       // 2 MB
@@ -318,6 +318,7 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
           api_key_configured: llmAvailable,
           available_evaluators: available as any,
           configured_providers: getConfiguredProviders(),
+          providers: getProviderList(),
         };
         return new Response(JSON.stringify(config), {
           headers: { ...headers, 'Content-Type': 'application/json' },

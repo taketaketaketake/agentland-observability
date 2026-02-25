@@ -93,6 +93,7 @@ export interface EvalScope {
 export interface EvalRunOptions {
   time_window_hours?: number;
   sample_limit?: number;
+  provider?: string;
 }
 
 export interface EvalRun {
@@ -139,10 +140,17 @@ export interface EvalSummary {
   summary: any | null;
 }
 
+export interface ProviderInfo {
+  name: string;
+  configured: boolean;
+  defaultModel: string;
+}
+
 export interface EvalConfig {
   api_key_configured: boolean;
   available_evaluators: EvaluatorType[];
   configured_providers?: string[];
+  providers: ProviderInfo[];
 }
 
 export interface EvalProgress {
