@@ -3,7 +3,12 @@ dist/
 *.db
 *.db-wal
 *.db-shm
+*.db.backup
+backups/
 .env
 .DS_Store
 __pycache__/
 *.pyc
+tsconfig.tsbuildinfo
+test-results/
+huh.md
