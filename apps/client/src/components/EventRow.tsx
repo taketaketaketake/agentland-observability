@@ -2,18 +2,21 @@ import { useState } from 'react';
 import type { HookEvent } from '../types';
 import { useEventColors } from '../hooks/useEventColors';
 import { useEventEmojis } from '../hooks/useEventEmojis';
+import { getEventSummary } from '../utils/eventSummary';
 import { API_URL } from '../config';
 import ChatTranscriptModal from './ChatTranscriptModal';
 
 interface EventRowProps {
   event: HookEvent;
+  index?: number;
   onSelectAgent?: (agentName: string) => void;
 }
 
-export default function EventRow({ event, onSelectAgent }: EventRowProps) {
+export default function EventRow({ event, index = 0, onSelectAgent }: EventRowProps) {
   const { getAppColor, getHexColorForApp } = useEventColors();
   const { getEventEmoji, getToolEmoji } = useEventEmojis();
   const [showChat, setShowChat] = useState(false);
+  const [showMessage, setShowMessage] = useState(false);
   const [hitlResponse, setHitlResponse] = useState('');
   const [hitlSending, setHitlSending] = useState(false);
 
@@ -29,24 +32,8 @@ export default function EventRow({ event, onSelectAgent }: EventRowProps) {
     ? new Date(event.timestamp).toLocaleTimeString()
     : '';
 
-  // Build payload preview
-  let payloadPreview = '';
-  if (toolName) {
-    const input = event.payload?.tool_input;
-    if (typeof input === 'string') {
-      payloadPreview = input.substring(0, 120);
-    } else if (input?.command) {
-      payloadPreview = input.command.substring(0, 120);
-    } else if (input?.file_path) {
-      payloadPreview = input.file_path;
-    } else if (input?.pattern) {
-      payloadPreview = input.pattern;
-    }
-  }
-
-  if (event.summary) {
-    payloadPreview = event.summary;
-  }
+  const payloadPreview = getEventSummary(event);
+  const lastAssistantMessage = event.payload?.last_assistant_message || '';
 
   const handleHITLSubmit = async () => {
     if (!event.id || !hitlResponse.trim()) return;
@@ -70,7 +57,7 @@ export default function EventRow({ event, onSelectAgent }: EventRowProps) {
 
   return (
     <>
-      <div className="group flex items-start gap-2 px-3 py-2 mobile:px-2 mobile:py-1.5 hover:bg-[var(--theme-hover-bg)] border-b border-[var(--theme-border-primary)] transition-colors">
+      <div className={`group flex items-start gap-2 px-3 py-2.5 mobile:px-2 mobile:py-1.5 hover:bg-[var(--theme-hover-bg)] border-b border-[var(--theme-border-primary)] transition-colors ${index % 2 === 1 ? 'bg-[var(--theme-bg-secondary)]' : ''}`}>
         {/* Emoji */}
         <span className="text-lg mobile:text-sm flex-shrink-0 mt-0.5">
           {toolName ? getToolEmoji(toolName) : getEventEmoji(event.hook_event_type)}
@@ -99,7 +86,15 @@ export default function EventRow({ event, onSelectAgent }: EventRowProps) {
         )}
 
         {/* Payload preview */}
-        <span className="flex-1 text-xs text-[var(--theme-text-tertiary)] truncate">
+        <span
+          className={`flex-1 text-xs text-[var(--theme-text-tertiary)] truncate ${lastAssistantMessage ? 'cursor-pointer hover:text-[var(--theme-text-secondary)]' : ''}`}
+          onClick={() => lastAssistantMessage && setShowMessage(!showMessage)}
+        >
+          {lastAssistantMessage && (
+            <span className="inline-block w-3 text-[10px] text-[var(--theme-text-quaternary)]">
+              {showMessage ? '\u25BC' : '\u25B6'}
+            </span>
+          )}
           {payloadPreview}
         </span>
 
@@ -125,6 +120,15 @@ export default function EventRow({ event, onSelectAgent }: EventRowProps) {
           {timestamp}
         </span>
       </div>
+
+      {/* Assistant message expandable */}
+      {showMessage && lastAssistantMessage && (
+        <div className="px-3 py-2 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)]">
+          <pre className="text-xs text-[var(--theme-text-secondary)] whitespace-pre-wrap font-sans leading-relaxed max-h-60 overflow-y-auto">
+            {lastAssistantMessage}
+          </pre>
+        </div>
+      )}
 
       {/* HITL section */}
       {isHITL && (

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import type { HookEvent, Filters } from '../types';
 import EventRow from './EventRow';
 
@@ -15,12 +15,11 @@ interface EventTimelineProps {
 export default function EventTimeline({
   events,
   filters,
-  stickToBottom,
-  onStickToBottomChange,
   onSelectAgent,
 }: EventTimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const isUserScrolling = useRef(false);
+  const PAGE_SIZE = 50;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const filteredEvents = useMemo(() => {
     return events.filter(event => {
@@ -28,35 +27,15 @@ export default function EventTimeline({
       if (filters.sessionId && event.session_id !== filters.sessionId) return false;
       if (filters.eventType && event.hook_event_type !== filters.eventType) return false;
       return true;
-    });
+    }).reverse();
   }, [events, filters]);
 
-  // Auto-scroll to bottom
-  useEffect(() => {
-    if (stickToBottom && containerRef.current && !isUserScrolling.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [filteredEvents, stickToBottom]);
-
-  // Detect manual scroll
-  const handleScroll = () => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
-    if (!isAtBottom && stickToBottom) {
-      isUserScrolling.current = true;
-      onStickToBottomChange(false);
-      setTimeout(() => { isUserScrolling.current = false; }, 100);
-    } else if (isAtBottom && !stickToBottom) {
-      onStickToBottomChange(true);
-    }
-  };
+  const visibleEvents = filteredEvents.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredEvents.length;
 
   return (
     <div
       ref={containerRef}
-      onScroll={handleScroll}
       className="flex-1 overflow-y-auto bg-[var(--theme-bg-primary)]"
     >
       {filteredEvents.length === 0 ? (
@@ -68,13 +47,24 @@ export default function EventTimeline({
           </div>
         </div>
       ) : (
-        filteredEvents.map((event) => (
-          <EventRow
-            key={event.id || `${event.timestamp}-${event.hook_event_type}`}
-            event={event}
-            onSelectAgent={onSelectAgent}
-          />
-        ))
+        <>
+          {visibleEvents.map((event, index) => (
+            <EventRow
+              key={event.id || `${event.timestamp}-${event.hook_event_type}`}
+              event={event}
+              index={index}
+              onSelectAgent={onSelectAgent}
+            />
+          ))}
+          {hasMore && (
+            <button
+              onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+              className="w-full py-2 text-xs text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-secondary)] hover:bg-[var(--theme-hover-bg)] transition-colors"
+            >
+              Load more ({filteredEvents.length - visibleCount} older events)
+            </button>
+          )}
+        </>
       )}
     </div>
   );

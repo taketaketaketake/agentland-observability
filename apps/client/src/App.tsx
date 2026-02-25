@@ -9,6 +9,7 @@ import LivePulseChart from './components/LivePulseChart';
 import ThemeManager from './components/ThemeManager';
 import ToastNotification from './components/ToastNotification';
 import AgentSwimLaneContainer from './components/AgentSwimLaneContainer';
+import AgentStatusPanel from './components/AgentStatusPanel';
 import { WS_URL } from './config';
 
 interface Toast {
@@ -151,6 +152,9 @@ export default function App() {
         onUpdateAllApps={setAllAppNames}
         onUpdateTimeRange={setCurrentTimeRange}
       />
+
+      {/* Agent Status Cards */}
+      <AgentStatusPanel events={events} onSelectAgent={toggleAgentLane} />
 
       {/* Agent Swim Lanes */}
       {selectedAgentLanes.length > 0 && (
