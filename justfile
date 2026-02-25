@@ -55,6 +55,14 @@ db-reset:
 
 # --- Testing ---
 
+test:
+    cd {{project_root}}/apps/server && bun test
+
+test-e2e:
+    cd {{project_root}}/apps/client && npx playwright test
+
+test-all: test test-e2e
+
 test-event:
     curl -s -X POST http://localhost:{{server_port}}/events \
       -H "Content-Type: application/json" \

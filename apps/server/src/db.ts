@@ -3,8 +3,8 @@ import type { HookEvent, FilterOptions, TranscriptMessage, TranscriptSessionSumm
 
 let db: Database;
 
-export function initDatabase(): void {
-  db = new Database('events.db');
+export function initDatabase(dbPath: string = 'events.db'): void {
+  db = new Database(dbPath);
 
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
