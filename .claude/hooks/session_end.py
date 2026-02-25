@@ -83,6 +83,8 @@ def ingest_transcript(session_id: str, source_app: str, cwd: str, transcript_pat
     skipped_no_content = 0
     parse_errors = 0
     messages = []
+    # Buffer for thinking-only assistant records to merge into the next text response
+    pending_thinking: list[str] = []
 
     try:
         with open(jsonl_path, "r") as f:
@@ -131,11 +133,25 @@ def ingest_transcript(session_id: str, source_app: str, cwd: str, transcript_pat
                             text_parts.append(block)
 
                 content = "\n\n".join(text_parts).strip()
-                if not content:
+                thinking = "\n\n".join(thinking_parts).strip() or None
+
+                if not content and not thinking:
                     skipped_no_content += 1
                     continue
 
-                thinking = "\n\n".join(thinking_parts).strip() or None
+                # Thinking-only assistant record: buffer it for the next text response
+                if role == "assistant" and thinking and not content:
+                    pending_thinking.append(thinking)
+                    continue
+
+                # Merge any buffered thinking into this assistant message
+                if role == "assistant" and pending_thinking:
+                    merged = "\n\n".join(pending_thinking)
+                    if thinking:
+                        thinking = merged + "\n\n" + thinking
+                    else:
+                        thinking = merged
+                    pending_thinking.clear()
 
                 message_data = {
                     "session_id": session_id,
