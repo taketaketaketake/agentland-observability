@@ -114,6 +114,40 @@ export function initDatabase(dbPath: string = 'events.db'): void {
   `);
 
   db.exec('CREATE INDEX IF NOT EXISTS idx_eval_baselines_type ON evaluation_baselines(evaluator_type)');
+
+  // ─── Session Analysis Tables ───
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS session_analyses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      source_app TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      analysis_json TEXT,
+      summary TEXT,
+      error_message TEXT,
+      model_name TEXT,
+      prompt_version TEXT,
+      message_count INTEGER,
+      tokens_analyzed INTEGER,
+      created_at INTEGER NOT NULL,
+      completed_at INTEGER
+    )
+  `);
+
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_session_analyses_session ON session_analyses(session_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_session_analyses_status ON session_analyses(status)');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cross_session_insights (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      insight_key TEXT NOT NULL UNIQUE,
+      analysis_json TEXT NOT NULL,
+      model_name TEXT,
+      session_count INTEGER,
+      created_at INTEGER NOT NULL
+    )
+  `);
 }
 
 export function insertEvent(event: HookEvent): HookEvent {
@@ -355,6 +389,221 @@ export function getSessionMessages(sessionId: string): TranscriptMessage[] {
     timestamp: row.timestamp,
     uuid: row.uuid,
   }));
+}
+
+export interface HistoricalInsightsResponse {
+  kpis: {
+    total_sessions: number;
+    total_messages: number;
+    avg_messages_per_session: number;
+    total_tokens: number;
+    unique_models: number;
+    active_days: number;
+    tool_success_rate: number;
+    avg_quality_score: number | null;
+  };
+  session_volume: Array<{ day: string; session_count: number }>;
+  token_by_model: Array<{ model: string; total_input: number; total_output: number; total_tokens: number }>;
+  quality_trend: Array<{ run_id: number; evaluator_type: string; timestamp: number; avg_score: number }>;
+  tool_reliability: Array<{ tool_name: string; success_count: number; failure_count: number; total_count: number }>;
+  activity_by_hour: Array<{ hour: number; event_count: number }>;
+}
+
+export function getHistoricalInsights(): HistoricalInsightsResponse {
+  // Q1: Message KPIs
+  const msgKpis = db.prepare(`
+    SELECT COUNT(DISTINCT session_id) AS total_sessions,
+           COUNT(*) AS total_messages,
+           COALESCE(SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0)), 0) AS total_tokens,
+           COUNT(DISTINCT model) AS unique_models
+    FROM messages WHERE source_app != 'evaluation-runner'
+  `).get() as any;
+
+  // Q2: Event KPIs
+  const eventKpis = db.prepare(`
+    SELECT COUNT(DISTINCT date(timestamp/1000, 'unixepoch', 'localtime')) AS active_days,
+           SUM(CASE WHEN hook_event_type='PostToolUse' THEN 1 ELSE 0 END) AS tool_success,
+           SUM(CASE WHEN hook_event_type='PostToolUseFailure' THEN 1 ELSE 0 END) AS tool_failure
+    FROM events WHERE source_app != 'evaluation-runner'
+  `).get() as any;
+
+  // Q3: Avg quality score
+  const qualityKpi = db.prepare(`
+    SELECT ROUND(AVG(numeric_score), 3) AS avg_quality_score
+    FROM evaluation_results WHERE run_id IN (SELECT id FROM evaluation_runs WHERE status='completed')
+  `).get() as any;
+
+  // Q4: Sessions by day (30 days)
+  const sessionRows = db.prepare(`
+    SELECT date(timestamp, 'localtime') AS day, COUNT(DISTINCT session_id) AS session_count
+    FROM messages WHERE timestamp >= date('now','-30 days') AND source_app != 'evaluation-runner'
+    GROUP BY day ORDER BY day ASC
+  `).all() as Array<{ day: string; session_count: number }>;
+
+  // Fill missing days for continuous chart
+  const sessionVolume: Array<{ day: string; session_count: number }> = [];
+  const dayMap = new Map(sessionRows.map(r => [r.day, r.session_count]));
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dayStr = d.toISOString().slice(0, 10);
+    sessionVolume.push({ day: dayStr, session_count: dayMap.get(dayStr) ?? 0 });
+  }
+
+  // Q5: Tokens by model (top 8)
+  const tokenByModel = db.prepare(`
+    SELECT model, SUM(COALESCE(input_tokens,0)) AS total_input,
+           SUM(COALESCE(output_tokens,0)) AS total_output
+    FROM messages WHERE model IS NOT NULL AND source_app != 'evaluation-runner'
+    GROUP BY model ORDER BY (total_input + total_output) DESC LIMIT 8
+  `).all() as Array<{ model: string; total_input: number; total_output: number }>;
+
+  // Q6: Quality trend (per completed eval run)
+  const qualityTrend = db.prepare(`
+    SELECT r.id AS run_id, r.evaluator_type, r.completed_at AS timestamp, ROUND(AVG(res.numeric_score), 3) AS avg_score
+    FROM evaluation_runs r JOIN evaluation_results res ON res.run_id = r.id
+    WHERE r.status='completed' GROUP BY r.id ORDER BY r.completed_at ASC
+  `).all() as Array<{ run_id: number; evaluator_type: string; timestamp: number; avg_score: number }>;
+
+  // Q7: Tool reliability (top 12)
+  const toolReliability = db.prepare(`
+    SELECT json_extract(payload, '$.tool_name') AS tool_name,
+           SUM(CASE WHEN hook_event_type='PostToolUse' THEN 1 ELSE 0 END) AS success_count,
+           SUM(CASE WHEN hook_event_type='PostToolUseFailure' THEN 1 ELSE 0 END) AS failure_count,
+           COUNT(*) AS total_count
+    FROM events WHERE hook_event_type IN ('PostToolUse','PostToolUseFailure')
+      AND json_extract(payload, '$.tool_name') IS NOT NULL AND source_app != 'evaluation-runner'
+    GROUP BY tool_name ORDER BY total_count DESC LIMIT 12
+  `).all() as Array<{ tool_name: string; success_count: number; failure_count: number; total_count: number }>;
+
+  // Q8: Activity by hour
+  const activityByHour = db.prepare(`
+    SELECT CAST(strftime('%H', timestamp/1000, 'unixepoch', 'localtime') AS INTEGER) AS hour,
+           COUNT(*) AS event_count
+    FROM events WHERE source_app != 'evaluation-runner'
+    GROUP BY hour ORDER BY hour ASC
+  `).all() as Array<{ hour: number; event_count: number }>;
+
+  // Compute derived KPIs
+  const totalSessions = msgKpis.total_sessions ?? 0;
+  const totalMessages = msgKpis.total_messages ?? 0;
+  const toolSuccess = eventKpis.tool_success ?? 0;
+  const toolFailure = eventKpis.tool_failure ?? 0;
+  const toolTotal = toolSuccess + toolFailure;
+
+  return {
+    kpis: {
+      total_sessions: totalSessions,
+      total_messages: totalMessages,
+      avg_messages_per_session: totalSessions > 0 ? Math.round(totalMessages / totalSessions) : 0,
+      total_tokens: msgKpis.total_tokens ?? 0,
+      unique_models: msgKpis.unique_models ?? 0,
+      active_days: eventKpis.active_days ?? 0,
+      tool_success_rate: toolTotal > 0 ? Math.round((toolSuccess / toolTotal) * 10000) / 100 : 0,
+      avg_quality_score: qualityKpi.avg_quality_score ?? null,
+    },
+    session_volume: sessionVolume,
+    token_by_model: tokenByModel.map(r => ({
+      ...r,
+      total_tokens: r.total_input + r.total_output,
+    })),
+    quality_trend: qualityTrend,
+    tool_reliability: toolReliability,
+    activity_by_hour: activityByHour,
+  };
+}
+
+// ─── Session Analysis CRUD ───
+
+export interface SessionAnalysisRow {
+  id: number;
+  session_id: string;
+  source_app: string;
+  status: string;
+  analysis_json: string | null;
+  summary: string | null;
+  error_message: string | null;
+  model_name: string | null;
+  prompt_version: string | null;
+  message_count: number | null;
+  tokens_analyzed: number | null;
+  created_at: number;
+  completed_at: number | null;
+}
+
+export function upsertSessionAnalysis(data: {
+  session_id: string;
+  source_app: string;
+  status: string;
+  analysis_json?: string | null;
+  summary?: string | null;
+  error_message?: string | null;
+  model_name?: string | null;
+  prompt_version?: string | null;
+  message_count?: number | null;
+  tokens_analyzed?: number | null;
+  created_at: number;
+  completed_at?: number | null;
+}): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO session_analyses
+      (session_id, source_app, status, analysis_json, summary, error_message, model_name, prompt_version, message_count, tokens_analyzed, created_at, completed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    data.session_id,
+    data.source_app,
+    data.status,
+    data.analysis_json ?? null,
+    data.summary ?? null,
+    data.error_message ?? null,
+    data.model_name ?? null,
+    data.prompt_version ?? null,
+    data.message_count ?? null,
+    data.tokens_analyzed ?? null,
+    data.created_at,
+    data.completed_at ?? null,
+  );
+}
+
+export function getSessionAnalysis(sessionId: string): SessionAnalysisRow | null {
+  return db.prepare('SELECT * FROM session_analyses WHERE session_id = ?').get(sessionId) as SessionAnalysisRow | null;
+}
+
+export function updateSessionAnalysis(sessionId: string, updates: Partial<Omit<SessionAnalysisRow, 'id' | 'session_id'>>): void {
+  const fields: string[] = [];
+  const values: any[] = [];
+  for (const [key, val] of Object.entries(updates)) {
+    fields.push(`${key} = ?`);
+    values.push(val ?? null);
+  }
+  if (fields.length === 0) return;
+  values.push(sessionId);
+  db.prepare(`UPDATE session_analyses SET ${fields.join(', ')} WHERE session_id = ?`).run(...values);
+}
+
+export function listSessionAnalyses(opts?: { status?: string; limit?: number }): SessionAnalysisRow[] {
+  const conditions: string[] = [];
+  const params: any[] = [];
+  if (opts?.status) {
+    conditions.push('status = ?');
+    params.push(opts.status);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = opts?.limit ?? 100;
+  params.push(limit);
+  return db.prepare(`SELECT * FROM session_analyses ${where} ORDER BY created_at DESC LIMIT ?`).all(...params) as SessionAnalysisRow[];
+}
+
+export function getCrossSessionInsight(key: string): { analysis_json: string; model_name: string | null; session_count: number | null; created_at: number } | null {
+  return db.prepare('SELECT analysis_json, model_name, session_count, created_at FROM cross_session_insights WHERE insight_key = ?').get(key) as any;
+}
+
+export function upsertCrossSessionInsight(key: string, data: { analysis_json: string; model_name?: string | null; session_count?: number | null }): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO cross_session_insights (insight_key, analysis_json, model_name, session_count, created_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(key, data.analysis_json, data.model_name ?? null, data.session_count ?? null, Date.now());
 }
 
 export { db };

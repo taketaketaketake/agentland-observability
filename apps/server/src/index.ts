@@ -1,7 +1,8 @@
-import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions, getDistinctProjects } from './db';
+import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions, getDistinctProjects, getHistoricalInsights, getSessionAnalysis, listSessionAnalyses, upsertSessionAnalysis } from './db';
 import { createEvalRun, getEvalRun, listEvalRuns, updateEvalRunStatus, deleteEvalRun, insertEvalResults, getEvalResults, getEvalSummary } from './evaluations';
 import { runEvaluation } from './evaluationRunner';
 import { isAnyProviderConfigured, getConfiguredProviders, getProviderList } from './evaluators/llmProvider';
+import { analyzeSession, synthesizeCrossSessions } from './sessionAnalyzer';
 import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage, EvalRunRequest, EvalConfig } from './types';
 
 const MAX_EVENT_SIZE = 2 * 1024 * 1024;       // 2 MB
@@ -200,6 +201,16 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
           console.log(`[transcripts] POST /transcripts — ${messages.length} messages, session=${messages[0]?.session_id?.substring(0, 8)}`);
           const inserted = insertMessages(messages);
           console.log(`[transcripts] Inserted ${inserted}/${messages.length} messages`);
+
+          // Fire-and-forget: auto-analyze session
+          const sessionId = messages[0]?.session_id;
+          const sourceApp = messages[0]?.source_app;
+          if (sessionId && sourceApp && inserted > 0) {
+            analyzeSession(sessionId, sourceApp).catch(err => {
+              console.error(`[session-analyzer] Auto-analyze failed for ${sessionId.substring(0, 8)}:`, err.message);
+            });
+          }
+
           return new Response(JSON.stringify({ inserted, total: messages.length }), {
             headers: { ...headers, 'Content-Type': 'application/json' },
           });
@@ -210,6 +221,14 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
             headers: { ...headers, 'Content-Type': 'application/json' },
           });
         }
+      }
+
+      // GET /insights/historical
+      if (url.pathname === '/insights/historical' && req.method === 'GET') {
+        const data = getHistoricalInsights();
+        return new Response(JSON.stringify(data), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
       }
 
       // GET /projects
@@ -244,6 +263,72 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
         return new Response(JSON.stringify(messages), {
           headers: { ...headers, 'Content-Type': 'application/json' },
         });
+      }
+
+      // ─── Session Analysis Endpoints ───
+
+      // GET /session-analysis (list)
+      if (url.pathname === '/session-analysis' && req.method === 'GET') {
+        const status = url.searchParams.get('status') || undefined;
+        const limit = parseInt(url.searchParams.get('limit') || '100');
+        const analyses = listSessionAnalyses({ status, limit });
+        return new Response(JSON.stringify(analyses), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /session-analysis/:session_id
+      if (url.pathname.match(/^\/session-analysis\/[^/]+$/) && req.method === 'GET' && !url.pathname.endsWith('/reanalyze')) {
+        const sid = decodeURIComponent(url.pathname.slice('/session-analysis/'.length));
+        const analysis = getSessionAnalysis(sid);
+        if (!analysis) {
+          return new Response(JSON.stringify({ status: 'not_found' }), {
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({
+          ...analysis,
+          analysis_json: analysis.analysis_json ? JSON.parse(analysis.analysis_json) : null,
+        }), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // POST /session-analysis/:session_id/reanalyze
+      if (url.pathname.match(/^\/session-analysis\/[^/]+\/reanalyze$/) && req.method === 'POST') {
+        const parts = url.pathname.split('/');
+        const sid = decodeURIComponent(parts[2]!);
+        // Reset and re-run
+        const existing = getSessionAnalysis(sid);
+        const srcApp = existing?.source_app || 'unknown';
+        upsertSessionAnalysis({
+          session_id: sid,
+          source_app: srcApp,
+          status: 'pending',
+          created_at: Date.now(),
+        });
+        analyzeSession(sid, srcApp).catch(err => {
+          console.error(`[session-analyzer] Re-analyze failed for ${sid.substring(0, 8)}:`, err.message);
+        });
+        return new Response(JSON.stringify({ status: 'reanalyzing' }), {
+          status: 202,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // GET /insights/ai
+      if (url.pathname === '/insights/ai' && req.method === 'GET') {
+        try {
+          const insights = await synthesizeCrossSessions();
+          return new Response(JSON.stringify(insights), {
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify({ error: 'synthesis_failed', message: err.message }), {
+            status: 500,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        }
       }
 
       // ─── Evaluation Endpoints ───

@@ -181,6 +181,28 @@ export interface ChartDataPoint {
   sessions: Record<string, number>;
 }
 
+/* ─── Historical Insights Types ─── */
+
+export interface HistoricalInsightsKPI {
+  total_sessions: number;
+  total_messages: number;
+  avg_messages_per_session: number;
+  total_tokens: number;
+  unique_models: number;
+  active_days: number;
+  tool_success_rate: number;
+  avg_quality_score: number | null;
+}
+
+export interface HistoricalInsightsResponse {
+  kpis: HistoricalInsightsKPI;
+  session_volume: Array<{ day: string; session_count: number }>;
+  token_by_model: Array<{ model: string; total_input: number; total_output: number; total_tokens: number }>;
+  quality_trend: Array<{ run_id: number; evaluator_type: string; timestamp: number; avg_score: number }>;
+  tool_reliability: Array<{ tool_name: string; success_count: number; failure_count: number; total_count: number }>;
+  activity_by_hour: Array<{ hour: number; event_count: number }>;
+}
+
 /* ─── Insights Dashboard Types ─── */
 
 export interface InsightsKPI {
@@ -218,4 +240,46 @@ export interface InsightsData {
   eventTimeline: AreaPoint[];
   topToolsRanking: BarItem[];
   agentActivity: BarItem[];
+}
+
+/* ─── Session Analysis Types ─── */
+
+export type SessionAnalysisStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface SessionAnalysis {
+  id: number;
+  session_id: string;
+  source_app: string;
+  status: SessionAnalysisStatus;
+  analysis_json: {
+    task_summary: string;
+    outcome: string;
+    complexity: string;
+    tools_used: string[];
+    key_decisions: string[];
+    issues: string[];
+    quality_score: number;
+    tags: string[];
+    duration_assessment: string;
+  } | null;
+  summary: string | null;
+  error_message: string | null;
+  model_name: string | null;
+  message_count: number | null;
+  created_at: number;
+  completed_at: number | null;
+}
+
+export interface CrossSessionInsights {
+  overall_summary: string;
+  common_patterns: string[];
+  top_tools: string[];
+  common_issues: string[];
+  quality_distribution: { high: number; medium: number; low: number };
+  task_categories: Record<string, number>;
+  outcome_distribution: Record<string, number>;
+  recommendations: string[];
+  productivity_assessment: string;
+  error?: string;
+  message?: string;
 }

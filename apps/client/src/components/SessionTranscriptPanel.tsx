@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import type { TranscriptMessage } from '../types';
+import type { TranscriptMessage, SessionAnalysis } from '../types';
+import { useSessionAnalysis } from '../hooks/useSessionAnalysis';
 import { API_URL } from '../config';
 
 interface SessionTranscriptPanelProps {
@@ -26,7 +27,9 @@ export default function SessionTranscriptPanel({ sessionId, agentId, onClose }: 
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { analysis, loading: analysisLoading, error: analysisError, reanalyze } = useSessionAnalysis(sessionId);
 
   useEffect(() => {
     setLoading(true);
@@ -52,6 +55,8 @@ export default function SessionTranscriptPanel({ sessionId, agentId, onClose }: 
     }
   }, [loading, messages.length]);
 
+  const hasAnalysis = analysis && analysis.status === 'completed' && analysis.analysis_json;
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
@@ -73,15 +78,42 @@ export default function SessionTranscriptPanel({ sessionId, agentId, onClose }: 
               {messages.length} msgs
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* AI Summary Button */}
+            <button
+              onClick={() => setShowAnalysis(v => !v)}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-[10px] font-mono transition-colors ${
+                hasAnalysis
+                  ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                  : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)]'
+              }`}
+              title="AI Summary"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+              </svg>
+              AI Summary
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-md text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* AI Analysis Display */}
+        {showAnalysis && (
+          <SessionAnalysisDisplay
+            analysis={analysis}
+            loading={analysisLoading}
+            error={analysisError}
+            onReanalyze={reanalyze}
+          />
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
@@ -118,6 +150,149 @@ export default function SessionTranscriptPanel({ sessionId, agentId, onClose }: 
 
           <div ref={bottomRef} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── AI Analysis Display ─── */
+
+const OUTCOME_COLORS: Record<string, string> = {
+  success: 'text-emerald-400 bg-emerald-500/10',
+  partial: 'text-amber-400 bg-amber-500/10',
+  failure: 'text-red-400 bg-red-500/10',
+  abandoned: 'text-gray-400 bg-gray-500/10',
+  unclear: 'text-blue-400 bg-blue-500/10',
+};
+
+const COMPLEXITY_COLORS: Record<string, string> = {
+  trivial: 'text-gray-400 bg-gray-500/10',
+  simple: 'text-emerald-400 bg-emerald-500/10',
+  moderate: 'text-blue-400 bg-blue-500/10',
+  complex: 'text-amber-400 bg-amber-500/10',
+  highly_complex: 'text-red-400 bg-red-500/10',
+};
+
+function SessionAnalysisDisplay({
+  analysis,
+  loading,
+  error,
+  onReanalyze,
+}: {
+  analysis: SessionAnalysis | null;
+  loading: boolean;
+  error: string | null;
+  onReanalyze: () => void;
+}) {
+  if (loading || (analysis && (analysis.status === 'pending' || analysis.status === 'running'))) {
+    return (
+      <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-surface)]">
+        <div className="flex items-center gap-2 text-xs text-[var(--theme-text-tertiary)]">
+          <div className="w-3 h-3 border border-[var(--theme-primary)] border-t-transparent rounded-full animate-spin" />
+          Analyzing session...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-surface)]">
+        <div className="text-xs text-[var(--theme-accent-error)]">Failed to load analysis: {error}</div>
+      </div>
+    );
+  }
+
+  if (!analysis || analysis.status === 'failed') {
+    return (
+      <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-surface)]">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[var(--theme-text-tertiary)]">
+            {analysis?.error_message || 'No analysis available'}
+          </span>
+          <button
+            onClick={onReanalyze}
+            className="text-[10px] font-mono text-[var(--theme-primary)] hover:underline"
+          >
+            {analysis ? 'Retry' : 'Analyze'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const data = analysis.analysis_json;
+  if (!data) return null;
+
+  return (
+    <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-surface)] space-y-2.5 max-h-[40vh] overflow-y-auto">
+      {/* Task summary */}
+      <p className="text-xs text-[var(--theme-text-primary)] leading-relaxed">{data.task_summary}</p>
+
+      {/* Badges row */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${OUTCOME_COLORS[data.outcome] || 'text-gray-400 bg-gray-500/10'}`}>
+          {data.outcome}
+        </span>
+        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${COMPLEXITY_COLORS[data.complexity] || 'text-gray-400 bg-gray-500/10'}`}>
+          {data.complexity}
+        </span>
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded text-yellow-400 bg-yellow-500/10">
+          {data.quality_score}/5
+        </span>
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded text-[var(--theme-text-quaternary)] bg-[var(--theme-bg-tertiary)]">
+          {data.duration_assessment}
+        </span>
+      </div>
+
+      {/* Tags */}
+      {data.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {data.tags.map(tag => (
+            <span key={tag} className="text-[9px] font-mono px-1.5 py-0.5 rounded-full border border-[var(--theme-border-secondary)] text-[var(--theme-text-tertiary)]">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Key decisions */}
+      {data.key_decisions.length > 0 && (
+        <div>
+          <span className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-quaternary)]">Key decisions</span>
+          <ul className="mt-0.5 space-y-0.5">
+            {data.key_decisions.map((d, i) => (
+              <li key={i} className="text-[10px] text-[var(--theme-text-secondary)] pl-2 border-l border-[var(--theme-border-secondary)]">{d}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Issues */}
+      {data.issues.length > 0 && (
+        <div>
+          <span className="text-[9px] font-mono uppercase tracking-wider text-[var(--theme-text-quaternary)]">Issues</span>
+          <ul className="mt-0.5 space-y-0.5">
+            {data.issues.map((issue, i) => (
+              <li key={i} className="text-[10px] text-red-400/80 pl-2 border-l border-red-500/20">{issue}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Re-analyze button */}
+      <div className="flex items-center justify-between pt-1">
+        {analysis.model_name && (
+          <span className="text-[9px] font-mono text-[var(--theme-text-quaternary)]">
+            via {analysis.model_name}
+          </span>
+        )}
+        <button
+          onClick={onReanalyze}
+          className="text-[10px] font-mono text-[var(--theme-primary)] hover:underline"
+        >
+          Re-analyze
+        </button>
       </div>
     </div>
   );

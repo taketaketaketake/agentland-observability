@@ -25,6 +25,7 @@ export default function TranscriptsListPanel({ onViewTranscript }: TranscriptsLi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [analyzedIds, setAnalyzedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setLoading(true);
@@ -42,6 +43,14 @@ export default function TranscriptsListPanel({ onViewTranscript }: TranscriptsLi
         setError(err.message);
         setLoading(false);
       });
+
+    // Fetch analyzed session IDs
+    fetch(`${API_URL}/session-analysis?status=completed&limit=200`)
+      .then(r => r.ok ? r.json() : [])
+      .then((analyses: any[]) => {
+        setAnalyzedIds(new Set(analyses.map(a => a.session_id)));
+      })
+      .catch(() => {});
   }, []);
 
   const filtered = sessions.filter(s => {
@@ -131,6 +140,11 @@ export default function TranscriptsListPanel({ onViewTranscript }: TranscriptsLi
                   <span className="text-[10px] font-mono text-[var(--theme-text-quaternary)] truncate">
                     {session.session_id.substring(0, 8)}
                   </span>
+                  {analyzedIds.has(session.session_id) && (
+                    <span className="text-[9px] font-mono font-semibold px-1 py-0.5 rounded bg-purple-500/15 text-purple-400">
+                      AI
+                    </span>
+                  )}
                 </div>
                 <svg
                   className="w-3.5 h-3.5 text-[var(--theme-text-quaternary)] group-hover:text-[var(--theme-primary)] transition-colors flex-shrink-0"
