@@ -23,7 +23,7 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: `VITE_API_URL=http://localhost:${SERVER_PORT} VITE_WS_URL=ws://localhost:${SERVER_PORT}/stream VITE_PORT=${CLIENT_PORT} npm run dev`,
+      command: `VITE_API_URL=http://localhost:${SERVER_PORT} VITE_WS_URL=ws://localhost:${SERVER_PORT}/stream VITE_PORT=${CLIENT_PORT} bun run dev`,
       port: CLIENT_PORT,
       reuseExistingServer: false,
     },

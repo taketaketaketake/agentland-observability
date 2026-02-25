@@ -164,6 +164,7 @@ cd apps/server && bun run dev
 2. Start the dashboard:
 
 ```bash
+cd /path/to/claude-observability
 cd apps/client && bun run dev
 ```
 

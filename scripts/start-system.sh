@@ -17,7 +17,7 @@ sleep 2
 # Start client
 echo "Starting client..."
 cd "$PROJECT_ROOT/apps/client"
-npm run dev &
+bun run dev &
 CLIENT_PID=$!
 
 echo ""

@@ -109,8 +109,7 @@ When you run Claude Code or Gemini CLI, they fire lifecycle hooks (tool use, ses
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (server runtime + SQLite)
-- [Node.js](https://nodejs.org/) 18+ (client build)
+- [Bun](https://bun.sh/) (runtime for server + client)
 - [uv](https://github.com/astral-sh/uv) (Python script runner for hooks)
 - [just](https://github.com/casey/just) (optional, task runner)
 
@@ -120,7 +119,7 @@ When you run Claude Code or Gemini CLI, they fire lifecycle hooks (tool use, ses
 just install
 # or manually:
 cd apps/server && bun install
-cd apps/client && npm install
+cd apps/client && bun install
 ```
 
 ### Run
@@ -258,7 +257,7 @@ Three tables added to the existing SQLite database:
 |-------|-----------|---------|
 | **Hooks** | Python 3.10+ / uv | Event emission from Claude Code + Gemini CLI |
 | **Server** | Bun + SQLite (WAL) | HTTP + WebSocket server, event storage |
-| **Client** | React 19 + TypeScript + Vite | Dashboard UI |
+| **Client** | React 19 + TypeScript + Vite (Bun) | Dashboard UI |
 | **Styling** | Tailwind CSS v3 | Dark industrial theme |
 | **Charts** | SVG (zero deps) | Data visualization |
 | **Transport** | WebSocket | Real-time event streaming |

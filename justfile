@@ -35,13 +35,13 @@ server-prod:
 # --- Client (React + Vite, port 5173) ---
 
 client-install:
-    cd {{project_root}}/apps/client && npm install
+    cd {{project_root}}/apps/client && bun install
 
 client:
-    cd {{project_root}}/apps/client && VITE_PORT={{client_port}} npm run dev
+    cd {{project_root}}/apps/client && VITE_PORT={{client_port}} bun run dev
 
 client-build:
-    cd {{project_root}}/apps/client && npm run build
+    cd {{project_root}}/apps/client && bun run build
 
 # --- Install ---
 
@@ -59,7 +59,7 @@ test:
     cd {{project_root}}/apps/server && bun test
 
 test-e2e:
-    cd {{project_root}}/apps/client && npx playwright test
+    cd {{project_root}}/apps/client && bunx playwright test
 
 test-all: test test-e2e
 
