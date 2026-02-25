@@ -263,12 +263,13 @@ export function listTranscriptSessions(projectDir?: string): TranscriptSessionSu
         MAX(timestamp) AS last_timestamp
       FROM messages
       WHERE session_id IN (
-        SELECT DISTINCT session_id FROM events WHERE json_extract(payload, '$.cwd') = ?
+        SELECT DISTINCT session_id FROM events
+        WHERE json_extract(payload, '$.cwd') = ? OR json_extract(payload, '$.cwd') LIKE ? || '/%'
       )
       GROUP BY session_id
       ORDER BY MAX(timestamp) DESC
     `);
-    return stmt.all(projectDir) as TranscriptSessionSummary[];
+    return stmt.all(projectDir, projectDir) as TranscriptSessionSummary[];
   }
 
   const stmt = db.prepare(`
@@ -291,19 +292,40 @@ export function listTranscriptSessions(projectDir?: string): TranscriptSessionSu
 export function getDistinctProjects(): { project_dir: string; display_name: string; session_count: number }[] {
   const rows = db.prepare(`
     SELECT
-      json_extract(payload, '$.cwd') AS project_dir,
+      json_extract(payload, '$.cwd') AS cwd,
       COUNT(DISTINCT session_id) AS session_count
     FROM events
     WHERE json_extract(payload, '$.cwd') IS NOT NULL
-    GROUP BY project_dir
+    GROUP BY cwd
     ORDER BY session_count DESC
-  `).all() as { project_dir: string; session_count: number }[];
+  `).all() as { cwd: string; session_count: number }[];
 
-  return rows.map(row => ({
-    project_dir: row.project_dir,
-    display_name: row.project_dir.split('/').pop() || row.project_dir,
-    session_count: row.session_count,
-  }));
+  // Deduplicate by shared root: group subdirectories under their parent
+  // Sort shortest-first so roots are encountered before their children
+  const sorted = [...rows].sort((a, b) => a.cwd.length - b.cwd.length);
+  const groups = new Map<string, number>();
+
+  for (const row of sorted) {
+    let merged = false;
+    for (const [root, count] of groups) {
+      if (row.cwd === root || row.cwd.startsWith(root + '/')) {
+        groups.set(root, count + row.session_count);
+        merged = true;
+        break;
+      }
+    }
+    if (!merged) {
+      groups.set(row.cwd, row.session_count);
+    }
+  }
+
+  return Array.from(groups.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([dir, count]) => ({
+      project_dir: dir,
+      display_name: dir.split('/').pop() || dir,
+      session_count: count,
+    }));
 }
 
 export function getSessionMessages(sessionId: string): TranscriptMessage[] {

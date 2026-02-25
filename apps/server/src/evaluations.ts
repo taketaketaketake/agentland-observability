@@ -296,8 +296,8 @@ export function getToolEvents(opts: { since?: number; session_id?: string; sourc
     params.push(opts.source_app);
   }
   if (opts.project_dir) {
-    conditions.push("json_extract(payload, '$.cwd') = ?");
-    params.push(opts.project_dir);
+    conditions.push("(json_extract(payload, '$.cwd') = ? OR json_extract(payload, '$.cwd') LIKE ? || '/%')");
+    params.push(opts.project_dir, opts.project_dir);
   }
 
   // Defense in depth: exclude evaluation system events
@@ -337,8 +337,8 @@ export function getAssistantMessages(opts: { since?: number; session_id?: string
     conditions.push('thinking IS NOT NULL');
   }
   if (opts.project_dir) {
-    conditions.push("session_id IN (SELECT DISTINCT session_id FROM events WHERE json_extract(payload, '$.cwd') = ?)");
-    params.push(opts.project_dir);
+    conditions.push("session_id IN (SELECT DISTINCT session_id FROM events WHERE json_extract(payload, '$.cwd') = ? OR json_extract(payload, '$.cwd') LIKE ? || '/%')");
+    params.push(opts.project_dir, opts.project_dir);
   }
 
   const rows = db.prepare(
