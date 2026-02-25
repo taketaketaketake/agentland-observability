@@ -5,8 +5,10 @@
         "matcher": "*",
         "hooks": [
           {
+            "name": "observability-session-start",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/session_start.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/session_start.py",
+            "timeout": 10000
           }
         ]
       }
@@ -16,8 +18,10 @@
         "matcher": "*",
         "hooks": [
           {
+            "name": "observability-session-end",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/session_end.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/session_end.py",
+            "timeout": 10000
           }
         ]
       }
@@ -27,8 +31,10 @@
         "matcher": ".*",
         "hooks": [
           {
+            "name": "observability-before-tool",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/before_tool.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/before_tool.py",
+            "timeout": 10000
           }
         ]
       }
@@ -38,8 +44,10 @@
         "matcher": ".*",
         "hooks": [
           {
+            "name": "observability-after-tool",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/after_tool.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/after_tool.py",
+            "timeout": 10000
           }
         ]
       }
@@ -49,8 +57,10 @@
         "matcher": "*",
         "hooks": [
           {
+            "name": "observability-notification",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/notification.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/notification.py",
+            "timeout": 10000
           }
         ]
       }
@@ -60,8 +70,10 @@
         "matcher": "*",
         "hooks": [
           {
+            "name": "observability-before-agent",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/before_agent.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/before_agent.py",
+            "timeout": 10000
           }
         ]
       }
@@ -71,8 +83,10 @@
         "matcher": "*",
         "hooks": [
           {
+            "name": "observability-after-agent",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/after_agent.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/after_agent.py",
+            "timeout": 10000
           }
         ]
       }
@@ -82,8 +96,10 @@
         "matcher": "*",
         "hooks": [
           {
+            "name": "observability-pre-compress",
             "type": "command",
-            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/pre_compress.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/pre_compress.py",
+            "timeout": 10000
           }
         ]
       }

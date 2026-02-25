@@ -10,6 +10,8 @@ import os
 import sys
 import requests
 
+sys.stdout = sys.stderr
+
 SERVER_URL = os.environ.get("OBSERVABILITY_SERVER_URL", "http://localhost:4000")
 
 
@@ -22,7 +24,7 @@ def main() -> None:
     except (json.JSONDecodeError, Exception):
         return
 
-    session_id = data.get("session_id", "unknown")
+    session_id = data.get("session_id") or os.environ.get("GEMINI_SESSION_ID", "unknown")
     tool_name = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})
 

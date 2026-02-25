@@ -10,6 +10,10 @@ import os
 import sys
 import requests
 
+# Gemini CLI parses stdout as JSON — redirect stdout to stderr so stray
+# prints from libraries never corrupt the response.
+sys.stdout = sys.stderr
+
 SERVER_URL = os.environ.get("OBSERVABILITY_SERVER_URL", "http://localhost:4000")
 
 
@@ -24,7 +28,7 @@ def send_event(hook_event_type: str, extra: dict | None = None) -> None:
     except (json.JSONDecodeError, Exception):
         return
 
-    session_id = data.get("session_id", "unknown")
+    session_id = data.get("session_id") or os.environ.get("GEMINI_SESSION_ID", "unknown")
     source_app = "gemini-cli"
 
     payload = data if isinstance(data, dict) else {"raw": data}
