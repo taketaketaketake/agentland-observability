@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import type { HookEvent, FilterOptions, TranscriptMessage } from './types';
+import type { HookEvent, FilterOptions, TranscriptMessage, TranscriptSessionSummary } from './types';
 
 let db: Database;
 
@@ -183,6 +183,24 @@ export function insertMessages(messages: TranscriptMessage[]): number {
   });
 
   return insertMany(messages);
+}
+
+export function listTranscriptSessions(): TranscriptSessionSummary[] {
+  const stmt = db.prepare(`
+    SELECT
+      session_id,
+      source_app,
+      COUNT(*) AS message_count,
+      SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) AS user_count,
+      SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) AS assistant_count,
+      MIN(timestamp) AS first_timestamp,
+      MAX(timestamp) AS last_timestamp
+    FROM messages
+    GROUP BY session_id
+    ORDER BY MAX(timestamp) DESC
+  `);
+
+  return stmt.all() as TranscriptSessionSummary[];
 }
 
 export function getSessionMessages(sessionId: string): TranscriptMessage[] {

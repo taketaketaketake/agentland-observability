@@ -1,4 +1,4 @@
-import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages } from './db';
+import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions } from './db';
 import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage } from './types';
 
 initDatabase();
@@ -162,21 +162,34 @@ const server = Bun.serve({
         const body = await req.json();
         const messages: TranscriptMessage[] = body.messages;
         if (!Array.isArray(messages) || messages.length === 0) {
+          console.log(`[transcripts] POST /transcripts — empty or missing messages array`);
           return new Response(JSON.stringify({ error: 'messages array required' }), {
             status: 400,
             headers: { ...headers, 'Content-Type': 'application/json' },
           });
         }
+        console.log(`[transcripts] POST /transcripts — ${messages.length} messages, session=${messages[0]?.session_id?.substring(0, 8)}`);
         const inserted = insertMessages(messages);
+        console.log(`[transcripts] Inserted ${inserted}/${messages.length} messages`);
         return new Response(JSON.stringify({ inserted, total: messages.length }), {
           headers: { ...headers, 'Content-Type': 'application/json' },
         });
       } catch (error) {
+        console.error(`[transcripts] POST /transcripts error:`, error);
         return new Response(JSON.stringify({ error: 'Invalid request' }), {
           status: 400,
           headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
+    }
+
+    // GET /transcripts (listing)
+    if (url.pathname === '/transcripts' && req.method === 'GET') {
+      const sessions = listTranscriptSessions();
+      console.log(`[transcripts] GET /transcripts — ${sessions.length} sessions`);
+      return new Response(JSON.stringify(sessions), {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+      });
     }
 
     // GET /transcripts/:session_id
@@ -189,6 +202,7 @@ const server = Bun.serve({
         });
       }
       const messages = getSessionMessages(sessionId);
+      console.log(`[transcripts] GET /transcripts/${sessionId.substring(0, 8)}… — ${messages.length} messages`);
       return new Response(JSON.stringify(messages), {
         headers: { ...headers, 'Content-Type': 'application/json' },
       });

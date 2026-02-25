@@ -55,3 +55,13 @@ export interface TranscriptMessage {
   timestamp: string;
   uuid: string;
 }
+
+export interface TranscriptSessionSummary {
+  session_id: string;
+  source_app: string;
+  message_count: number;
+  user_count: number;
+  assistant_count: number;
+  first_timestamp: string;
+  last_timestamp: string;
+}

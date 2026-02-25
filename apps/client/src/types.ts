@@ -67,6 +67,16 @@ export interface TranscriptMessage {
   uuid: string;
 }
 
+export interface TranscriptSessionSummary {
+  session_id: string;
+  source_app: string;
+  message_count: number;
+  user_count: number;
+  assistant_count: number;
+  first_timestamp: string;
+  last_timestamp: string;
+}
+
 export type TimeRange = '1m' | '3m' | '5m' | '10m';
 
 export interface ChartDataPoint {

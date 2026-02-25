@@ -10,6 +10,7 @@ interface EventRowProps {
   event: HookEvent;
   index?: number;
   onSelectAgent?: (agentName: string) => void;
+  onViewTranscript?: (sessionId: string, agentId: string) => void;
 }
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
@@ -28,7 +29,7 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 
 const DEFAULT_TYPE_COLOR = 'text-[var(--theme-text-secondary)] bg-[var(--theme-bg-tertiary)] border-[var(--theme-border-primary)]';
 
-export default function EventRow({ event, index = 0, onSelectAgent }: EventRowProps) {
+export default function EventRow({ event, index = 0, onSelectAgent, onViewTranscript }: EventRowProps) {
   const { getHexColorForApp } = useEventColors();
   const { getToolEmoji } = useEventEmojis();
   const [showChat, setShowChat] = useState(false);
@@ -140,6 +141,19 @@ export default function EventRow({ event, index = 0, onSelectAgent }: EventRowPr
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
             {event.chat.length}
+          </button>
+        )}
+
+        {/* Transcript button */}
+        {onViewTranscript && (
+          <button
+            onClick={() => onViewTranscript(event.session_id, agentId)}
+            title="View session transcript"
+            className="flex-shrink-0 flex items-center text-[10px] font-mono px-1 py-0.5 rounded border border-[var(--theme-border-primary)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-primary)] hover:border-[var(--theme-border-secondary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors opacity-0 group-hover:opacity-100"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
           </button>
         )}
 

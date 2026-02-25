@@ -10,12 +10,14 @@ interface EventTimelineProps {
   stickToBottom: boolean;
   onStickToBottomChange: (value: boolean) => void;
   onSelectAgent?: (agentName: string) => void;
+  onViewTranscript?: (sessionId: string, agentId: string) => void;
 }
 
 export default function EventTimeline({
   events,
   filters,
   onSelectAgent,
+  onViewTranscript,
 }: EventTimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 50;
@@ -75,6 +77,7 @@ export default function EventTimeline({
               event={event}
               index={index}
               onSelectAgent={onSelectAgent}
+              onViewTranscript={onViewTranscript}
             />
           ))}
           {hasMore && (
