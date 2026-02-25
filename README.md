@@ -61,12 +61,15 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 │
 ├── apps/
 │   ├── server/                       # Bun + SQLite backend
+│   │   ├── tests/                    # Bun test suite (DB + API + WebSocket)
 │   │   └── src/
 │   │       ├── index.ts              # HTTP routes + WebSocket server
 │   │       ├── db.ts                 # SQLite schema, queries, WAL mode
 │   │       └── types.ts              # Shared TypeScript interfaces
 │   │
 │   └── client/                       # React 19 + Vite + Tailwind dashboard
+│       ├── e2e/                      # Playwright browser tests
+│       ├── playwright.config.ts      # Playwright config (ports 4444/5174)
 │       └── src/
 │           ├── App.tsx               # Main layout (Live / Insights / Transcripts tabs)
 │           ├── config.ts             # WS_URL, API_URL, MAX_EVENTS
@@ -123,12 +126,23 @@ The `.claude/settings.json` is already committed to this repo with portable path
 ### Test
 
 ```bash
-# Send a test event
+# Run server unit + integration tests (Bun test, 31 tests)
+just test
+
+# Run browser e2e tests (Playwright + Chromium, 5 tests)
+just test-e2e
+
+# Run everything
+just test-all
+
+# Send a manual test event
 just test-event
 
 # Open the dashboard
 just open
 ```
+
+The server tests use in-memory SQLite for DB tests and a real server on a random port for API tests. The Playwright tests spin up dedicated server (port 4444) and client (port 5174) instances with a temporary DB to avoid collisions with dev servers.
 
 ## Stack
 
@@ -140,6 +154,8 @@ just open
 | **Styling** | Tailwind CSS v3 | Dark industrial theme |
 | **Charts** | SVG (zero deps) | Data visualization |
 | **Transport** | WebSocket | Real-time event streaming |
+| **Server Tests** | Bun test | DB + API + WebSocket integration tests |
+| **E2E Tests** | Playwright (Chromium) | Browser tests for dashboard, events, transcripts |
 
 ## Environment Variables
 

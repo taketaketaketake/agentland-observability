@@ -21,6 +21,13 @@
 - Event export / replay
 - Alerting / notification rules
 
+### Testing
+
+- **Server tests** (`apps/server/tests/`): 31 Bun tests covering DB operations (in-memory SQLite) and API/WebSocket endpoints (real server on random port with temp DB)
+- **E2E tests** (`apps/client/e2e/`): 5 Playwright tests covering dashboard loading, tab switching, real-time event delivery via WebSocket, multi-agent display, and transcript viewing
+- Server is testable via `createServer({ port, dbPath })` export and `import.meta.main` guard
+- E2E uses dedicated ports (server 4444, client 5174) with a fresh temp DB per run
+
 ## Layers
 
 ```
@@ -96,6 +103,8 @@
 | Server | Bun | 4000 | HTTP REST + WebSocket + SQLite |
 | Client | Vite (dev) / static (prod) | 5173 | React dashboard |
 | Hooks | Python via `uv run --script` | — | Event emission scripts |
+| Server Tests | Bun test | — | DB + API + WebSocket integration tests |
+| E2E Tests | Playwright (Chromium) | 4444/5174 | Browser tests against test server |
 
 ### Databases
 
