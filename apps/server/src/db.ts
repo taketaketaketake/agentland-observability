@@ -250,7 +250,27 @@ export function insertMessages(messages: TranscriptMessage[]): number {
   return insertMany(messages);
 }
 
-export function listTranscriptSessions(): TranscriptSessionSummary[] {
+export function listTranscriptSessions(projectDir?: string): TranscriptSessionSummary[] {
+  if (projectDir) {
+    const stmt = db.prepare(`
+      SELECT
+        session_id,
+        source_app,
+        COUNT(*) AS message_count,
+        SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END) AS user_count,
+        SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END) AS assistant_count,
+        MIN(timestamp) AS first_timestamp,
+        MAX(timestamp) AS last_timestamp
+      FROM messages
+      WHERE session_id IN (
+        SELECT DISTINCT session_id FROM events WHERE json_extract(payload, '$.cwd') = ?
+      )
+      GROUP BY session_id
+      ORDER BY MAX(timestamp) DESC
+    `);
+    return stmt.all(projectDir) as TranscriptSessionSummary[];
+  }
+
   const stmt = db.prepare(`
     SELECT
       session_id,
@@ -266,6 +286,24 @@ export function listTranscriptSessions(): TranscriptSessionSummary[] {
   `);
 
   return stmt.all() as TranscriptSessionSummary[];
+}
+
+export function getDistinctProjects(): { project_dir: string; display_name: string; session_count: number }[] {
+  const rows = db.prepare(`
+    SELECT
+      json_extract(payload, '$.cwd') AS project_dir,
+      COUNT(DISTINCT session_id) AS session_count
+    FROM events
+    WHERE json_extract(payload, '$.cwd') IS NOT NULL
+    GROUP BY project_dir
+    ORDER BY session_count DESC
+  `).all() as { project_dir: string; session_count: number }[];
+
+  return rows.map(row => ({
+    project_dir: row.project_dir,
+    display_name: row.project_dir.split('/').pop() || row.project_dir,
+    session_count: row.session_count,
+  }));
 }
 
 export function getSessionMessages(sessionId: string): TranscriptMessage[] {

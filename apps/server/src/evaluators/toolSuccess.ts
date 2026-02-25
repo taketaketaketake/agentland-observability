@@ -15,6 +15,7 @@ export const toolSuccessEvaluator: Evaluator = {
       since,
       session_id: ctx.scope.session_id,
       source_app: ctx.scope.source_app,
+      project_dir: ctx.options.project_dir,
     });
 
     ctx.onProgress(0, events.length);

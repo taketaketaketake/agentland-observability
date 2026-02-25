@@ -94,7 +94,16 @@ export interface EvalRunOptions {
   time_window_hours?: number;
   sample_limit?: number;
   provider?: string;
+  project_dir?: string;
 }
+
+export interface ProjectInfo {
+  project_dir: string;
+  display_name: string;
+  session_count: number;
+}
+
+export type TimeRangeOption = '24h' | '7d' | '30d' | 'all';
 
 export interface EvalRun {
   id: number;

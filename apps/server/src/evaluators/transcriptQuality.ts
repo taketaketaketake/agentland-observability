@@ -74,6 +74,7 @@ export const transcriptQualityEvaluator: Evaluator = {
       since,
       session_id: ctx.scope.session_id,
       source_app: ctx.scope.source_app,
+      project_dir: ctx.options.project_dir,
     });
 
     const sampled = stratifiedSample(allMessages, sampleLimit);

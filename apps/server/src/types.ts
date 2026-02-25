@@ -85,6 +85,7 @@ export interface EvalRunOptions {
   temperature?: number;
   max_tokens?: number;
   provider?: string;
+  project_dir?: string;
 }
 
 export interface EvalRunRequest {

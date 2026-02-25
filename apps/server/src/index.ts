@@ -1,4 +1,4 @@
-import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions } from './db';
+import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions, getDistinctProjects } from './db';
 import { createEvalRun, getEvalRun, listEvalRuns, updateEvalRunStatus, deleteEvalRun, insertEvalResults, getEvalResults, getEvalSummary } from './evaluations';
 import { runEvaluation } from './evaluationRunner';
 import { isAnyProviderConfigured, getConfiguredProviders, getProviderList } from './evaluators/llmProvider';
@@ -212,10 +212,19 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
         }
       }
 
+      // GET /projects
+      if (url.pathname === '/projects' && req.method === 'GET') {
+        const projects = getDistinctProjects();
+        return new Response(JSON.stringify(projects), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+
       // GET /transcripts (listing)
       if (url.pathname === '/transcripts' && req.method === 'GET') {
-        const sessions = listTranscriptSessions();
-        console.log(`[transcripts] GET /transcripts — ${sessions.length} sessions`);
+        const projectDir = url.searchParams.get('project_dir') || undefined;
+        const sessions = listTranscriptSessions(projectDir);
+        console.log(`[transcripts] GET /transcripts — ${sessions.length} sessions${projectDir ? ` (project: ${projectDir})` : ''}`);
         return new Response(JSON.stringify(sessions), {
           headers: { ...headers, 'Content-Type': 'application/json' },
         });

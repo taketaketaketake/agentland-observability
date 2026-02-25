@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEvaluations } from '../hooks/useEvaluations';
-import type { EvaluatorType, EvalRun, EvalSummary, EvalProgress, ProviderInfo } from '../types';
+import type { EvaluatorType, EvalRun, EvalSummary, EvalProgress, ProviderInfo, TimeRangeOption } from '../types';
 import SuccessRateChart from './charts/SuccessRateChart';
 import ScoreDistributionChart from './charts/ScoreDistributionChart';
 import EvalRunDetailPanel from './EvalRunDetailPanel';
@@ -39,6 +39,8 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
     runningEvals,
     loading,
     error,
+    projects,
+    sessions,
     startEvaluation,
     deleteRun,
     fetchRun,
@@ -47,11 +49,17 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
     selectedResults,
     setSelectedRun,
     handleProgress,
+    fetchSessions,
   } = useEvaluations();
 
   const [detailRunId, setDetailRunId] = useState<number | null>(null);
   const [runningButtons, setRunningButtons] = useState<Set<EvaluatorType>>(new Set());
   const [selectedProviders, setSelectedProviders] = useState<Record<string, string>>({});
+  const [evalFilters, setEvalFilters] = useState<{
+    timeRange: TimeRangeOption;
+    projectDir: string;
+    sessionId: string;
+  }>({ timeRange: '24h', projectDir: '', sessionId: '' });
 
   // Wire up WebSocket progress
   useEffect(() => {
@@ -60,11 +68,31 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
     }
   }, [onEvaluationProgress, handleProgress]);
 
+  // Re-fetch sessions when project filter changes
+  useEffect(() => {
+    fetchSessions(evalFilters.projectDir || undefined);
+    setEvalFilters(prev => ({ ...prev, sessionId: '' }));
+  }, [evalFilters.projectDir, fetchSessions]);
+
+  const TIME_RANGE_MAP: Record<TimeRangeOption, number | undefined> = {
+    '24h': 24,
+    '7d': 168,
+    '30d': 720,
+    'all': undefined,
+  };
+
   const handleRun = useCallback(async (type: EvaluatorType) => {
     if (runningButtons.has(type)) return;
     setRunningButtons(prev => new Set(prev).add(type));
     const provider = selectedProviders[type] || undefined;
-    await startEvaluation(type, { type: 'global' }, { time_window_hours: 24, provider });
+    const scope = evalFilters.sessionId
+      ? { type: 'session' as const, session_id: evalFilters.sessionId }
+      : { type: 'global' as const };
+    const options: Record<string, any> = { provider };
+    const timeHours = TIME_RANGE_MAP[evalFilters.timeRange];
+    if (timeHours !== undefined) options.time_window_hours = timeHours;
+    if (evalFilters.projectDir) options.project_dir = evalFilters.projectDir;
+    await startEvaluation(type, scope, options);
     // Debounce: prevent re-run for 2 seconds
     setTimeout(() => {
       setRunningButtons(prev => {
@@ -73,7 +101,7 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
         return next;
       });
     }, 2000);
-  }, [startEvaluation, runningButtons, selectedProviders]);
+  }, [startEvaluation, runningButtons, selectedProviders, evalFilters]);
 
   const handleViewDetail = useCallback(async (runId: number) => {
     setDetailRunId(runId);
@@ -169,6 +197,64 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
               : 'var(--theme-accent-success)'
           }
         />
+      </div>
+
+      {/* ─── Scope Filters ─── */}
+      <div className="flex items-center gap-3 px-3 py-2 mb-6 rounded-lg border border-[var(--theme-border-primary)] bg-[var(--theme-bg-tertiary)]">
+        <span className="text-[9px] font-mono font-semibold tracking-widest uppercase text-[var(--theme-text-tertiary)]">
+          Scope
+        </span>
+
+        <select
+          value={evalFilters.timeRange}
+          onChange={(e) => setEvalFilters(prev => ({ ...prev, timeRange: e.target.value as TimeRangeOption }))}
+          className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] appearance-none cursor-pointer"
+        >
+          <option value="24h">Last 24 hours</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+          <option value="all">All time</option>
+        </select>
+
+        <select
+          value={evalFilters.projectDir}
+          onChange={(e) => setEvalFilters(prev => ({ ...prev, projectDir: e.target.value }))}
+          className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] appearance-none cursor-pointer"
+        >
+          <option value="">All Projects</option>
+          {projects.map(p => (
+            <option key={p.project_dir} value={p.project_dir}>
+              {p.display_name} ({p.session_count})
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={evalFilters.sessionId}
+          onChange={(e) => setEvalFilters(prev => ({ ...prev, sessionId: e.target.value }))}
+          className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] appearance-none cursor-pointer"
+        >
+          <option value="">All Sessions</option>
+          {sessions[0] && (
+            <option value={sessions[0].session_id}>
+              Last Session ({sessions[0].session_id.substring(0, 8)}...)
+            </option>
+          )}
+          {sessions.slice(1).map(s => (
+            <option key={s.session_id} value={s.session_id}>
+              {s.session_id.substring(0, 8)}... ({s.message_count} msgs)
+            </option>
+          ))}
+        </select>
+
+        {(evalFilters.timeRange !== '24h' || evalFilters.projectDir || evalFilters.sessionId) && (
+          <button
+            onClick={() => setEvalFilters({ timeRange: '24h', projectDir: '', sessionId: '' })}
+            className="text-[10px] font-mono text-[var(--theme-accent-error)] hover:underline transition-colors"
+          >
+            Reset
+          </button>
+        )}
       </div>
 
       {/* ─── Evaluator Cards Grid ─── */}

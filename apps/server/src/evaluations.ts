@@ -279,7 +279,7 @@ export function getEvalSummary() {
 
 // ─── Queries for evaluators ───
 
-export function getToolEvents(opts: { since?: number; session_id?: string; source_app?: string }) {
+export function getToolEvents(opts: { since?: number; session_id?: string; source_app?: string; project_dir?: string }) {
   const conditions: string[] = ["hook_event_type IN ('PostToolUse', 'PostToolUseFailure')"];
   const params: any[] = [];
 
@@ -294,6 +294,10 @@ export function getToolEvents(opts: { since?: number; session_id?: string; sourc
   if (opts.source_app) {
     conditions.push('source_app = ?');
     params.push(opts.source_app);
+  }
+  if (opts.project_dir) {
+    conditions.push("json_extract(payload, '$.cwd') = ?");
+    params.push(opts.project_dir);
   }
 
   // Defense in depth: exclude evaluation system events
@@ -313,7 +317,7 @@ export function getToolEvents(opts: { since?: number; session_id?: string; sourc
   }));
 }
 
-export function getAssistantMessages(opts: { since?: number; session_id?: string; source_app?: string; with_thinking?: boolean }) {
+export function getAssistantMessages(opts: { since?: number; session_id?: string; source_app?: string; with_thinking?: boolean; project_dir?: string }) {
   const conditions: string[] = ["role = 'assistant'", "source_app != 'evaluation-runner'"];
   const params: any[] = [];
 
@@ -331,6 +335,10 @@ export function getAssistantMessages(opts: { since?: number; session_id?: string
   }
   if (opts.with_thinking) {
     conditions.push('thinking IS NOT NULL');
+  }
+  if (opts.project_dir) {
+    conditions.push("session_id IN (SELECT DISTINCT session_id FROM events WHERE json_extract(payload, '$.cwd') = ?)");
+    params.push(opts.project_dir);
   }
 
   const rows = db.prepare(

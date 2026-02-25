@@ -71,6 +71,7 @@ export const reasoningQualityEvaluator: Evaluator = {
       session_id: ctx.scope.session_id,
       source_app: ctx.scope.source_app,
       with_thinking: true,
+      project_dir: ctx.options.project_dir,
     });
 
     const sampled = stratifiedSample(allMessages, sampleLimit);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { EvalRun, EvalResult, EvalSummary, EvalConfig, EvalProgress, EvaluatorType, EvalScope, EvalRunOptions } from '../types';
+import type { EvalRun, EvalResult, EvalSummary, EvalConfig, EvalProgress, EvaluatorType, EvalScope, EvalRunOptions, ProjectInfo, TranscriptSessionSummary } from '../types';
 import { API_URL } from '../config';
 
 export function useEvaluations() {
@@ -11,6 +11,8 @@ export function useEvaluations() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [runningEvals, setRunningEvals] = useState<Map<number, EvalProgress>>(new Map());
+  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [sessions, setSessions] = useState<TranscriptSessionSummary[]>([]);
 
   // Fetch config on mount
   useEffect(() => {
@@ -19,6 +21,32 @@ export function useEvaluations() {
       .then(setConfig)
       .catch(err => console.error('Failed to fetch eval config:', err));
   }, []);
+
+  // Fetch projects on mount
+  useEffect(() => {
+    fetch(`${API_URL}/projects`)
+      .then(r => r.json())
+      .then(setProjects)
+      .catch(err => console.error('Failed to fetch projects:', err));
+  }, []);
+
+  // Fetch sessions (optionally filtered by project)
+  const fetchSessions = useCallback(async (projectDir?: string) => {
+    try {
+      const params = new URLSearchParams();
+      if (projectDir) params.set('project_dir', projectDir);
+      const r = await fetch(`${API_URL}/transcripts?${params}`);
+      const data = await r.json();
+      setSessions(data);
+    } catch (err) {
+      console.error('Failed to fetch sessions:', err);
+    }
+  }, []);
+
+  // Fetch sessions on mount
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
 
   // Fetch summaries
   const fetchSummaries = useCallback(async () => {
@@ -147,6 +175,8 @@ export function useEvaluations() {
     loading,
     error,
     runningEvals,
+    projects,
+    sessions,
     startEvaluation,
     fetchSummaries,
     fetchRuns,
@@ -155,5 +185,6 @@ export function useEvaluations() {
     deleteRun,
     handleProgress,
     setSelectedRun,
+    fetchSessions,
   };
 }
