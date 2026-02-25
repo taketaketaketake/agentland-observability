@@ -1,6 +1,7 @@
 import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages, listTranscriptSessions } from './db';
 import { createEvalRun, getEvalRun, listEvalRuns, updateEvalRunStatus, deleteEvalRun, insertEvalResults, getEvalResults, getEvalSummary } from './evaluations';
 import { runEvaluation } from './evaluationRunner';
+import { isAnyProviderConfigured, getConfiguredProviders } from './evaluators/llmProvider';
 import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage, EvalRunRequest, EvalConfig } from './types';
 
 const MAX_EVENT_SIZE = 2 * 1024 * 1024;       // 2 MB
@@ -306,16 +307,17 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
 
       // GET /evaluations/config
       if (url.pathname === '/evaluations/config' && req.method === 'GET') {
-        const apiKeyConfigured = !!process.env.ANTHROPIC_API_KEY;
+        const llmAvailable = isAnyProviderConfigured();
         const available: string[] = ['tool_success'];
-        if (apiKeyConfigured) {
+        if (llmAvailable) {
           available.push('transcript_quality', 'reasoning_quality');
         }
         available.push('regression');
 
         const config: EvalConfig = {
-          api_key_configured: apiKeyConfigured,
+          api_key_configured: llmAvailable,
           available_evaluators: available as any,
+          configured_providers: getConfiguredProviders(),
         };
         return new Response(JSON.stringify(config), {
           headers: { ...headers, 'Content-Type': 'application/json' },

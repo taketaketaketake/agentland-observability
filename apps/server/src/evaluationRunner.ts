@@ -4,6 +4,7 @@ import { toolSuccessEvaluator } from './evaluators/toolSuccess';
 import { transcriptQualityEvaluator } from './evaluators/transcriptQuality';
 import { reasoningQualityEvaluator } from './evaluators/reasoningQuality';
 import { regressionEvaluator } from './evaluators/regression';
+import { isAnyProviderConfigured } from './evaluators/llmProvider';
 import type { Evaluator, EvaluatorContext } from './evaluators/types';
 
 const evaluators: Record<string, Evaluator> = {
@@ -32,10 +33,10 @@ export async function runEvaluation(
     return;
   }
 
-  // Check API key requirement
-  if (evaluator.requiresApiKey && !process.env.ANTHROPIC_API_KEY) {
+  // Check LLM provider requirement
+  if (evaluator.requiresApiKey && !isAnyProviderConfigured()) {
     updateEvalRunStatus(run.id, 'failed', {
-      error_message: `${run.evaluator_type} requires ANTHROPIC_API_KEY to be set`,
+      error_message: `${run.evaluator_type} requires an LLM provider. Set ANTHROPIC_API_KEY or GOOGLE_API_KEY.`,
       completed_at: Date.now(),
     });
     broadcastProgress(run.id, 'failed', 0, 0);

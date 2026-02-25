@@ -1,7 +1,7 @@
 import type { EvaluatorContext, EvaluatorOutput, Evaluator } from './types';
 import type { EvalResult } from '../types';
 import { getAssistantMessages, getPrecedingUserMessage } from '../evaluations';
-import { callClaude, getEvalModel, parseJudgeResponse } from './anthropicClient';
+import { callLLM, getEvalModel, parseJudgeResponse } from './llmProvider';
 
 export const REASONING_QUALITY_PROMPT_VERSION = 'v1';
 
@@ -91,7 +91,7 @@ export const reasoningQualityEvaluator: Evaluator = {
       const thinkingTokenCount = msg.thinking ? msg.thinking.split(/\s+/).length : 0;
 
       try {
-        const response = await callClaude({
+        const response = await callLLM({
           system: SYSTEM_PROMPT,
           messages: [{
             role: 'user',

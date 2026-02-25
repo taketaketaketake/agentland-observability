@@ -1,7 +1,7 @@
 import type { EvaluatorContext, EvaluatorOutput, Evaluator } from './types';
 import type { EvalResult } from '../types';
 import { getAssistantMessages, getPrecedingUserMessage } from '../evaluations';
-import { callClaude, getEvalModel, parseJudgeResponse } from './anthropicClient';
+import { callLLM, getEvalModel, parseJudgeResponse } from './llmProvider';
 
 export const TRANSCRIPT_QUALITY_PROMPT_VERSION = 'v1';
 
@@ -92,7 +92,7 @@ export const transcriptQualityEvaluator: Evaluator = {
       const truncatedAssistant = msg.content.length > 3000 ? msg.content.substring(0, 3000) + '...' : msg.content;
 
       try {
-        const response = await callClaude({
+        const response = await callLLM({
           system: SYSTEM_PROMPT,
           messages: [{
             role: 'user',

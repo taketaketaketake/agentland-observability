@@ -142,6 +142,7 @@ export interface EvalSummary {
 export interface EvalConfig {
   api_key_configured: boolean;
   available_evaluators: EvaluatorType[];
+  configured_providers?: string[];
 }
 
 export interface EvalProgress {
