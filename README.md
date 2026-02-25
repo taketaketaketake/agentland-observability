@@ -71,7 +71,7 @@ When you run Claude Code, it fires lifecycle hooks (tool use, session start/end,
 │   │       ├── evaluationRunner.ts   # Evaluator orchestration + progress broadcast
 │   │       └── evaluators/           # Pluggable evaluator modules
 │   │           ├── types.ts          # Evaluator interface
-│   │           ├── anthropicClient.ts # Claude API wrapper for LLM-as-judge
+│   │           ├── llmProvider.ts    # Multi-provider LLM abstraction (Anthropic, Gemini)
 │   │           ├── toolSuccess.ts    # Tool success/failure rate (no API key)
 │   │           ├── transcriptQuality.ts  # LLM judge: helpfulness/accuracy/conciseness
 │   │           ├── reasoningQuality.ts   # LLM judge: depth/coherence/self-correction
@@ -166,8 +166,8 @@ The Evals tab lets you assess agent quality on-demand. Click "Run" on any evalua
 
 ### Evaluators
 
-| Evaluator | What it measures | API key needed | Cost |
-|-----------|-----------------|----------------|------|
+| Evaluator | What it measures | LLM provider needed | Cost |
+|-----------|-----------------|---------------------|------|
 | **Tool Success** | Success/failure rate per tool and agent | No | Zero (pure logic) |
 | **Transcript Quality** | Helpfulness, accuracy, conciseness (1-5 each) | Yes | LLM calls |
 | **Reasoning Quality** | Thinking depth, coherence, self-correction (1-5 each) | Yes | LLM calls |
@@ -185,11 +185,36 @@ User clicks "Run"  →  POST /evaluations/run  →  Server runs evaluator async
 ```
 
 - **Tool success** scans `PostToolUse`/`PostToolUseFailure` events and computes rates grouped by tool name and agent
-- **Transcript quality** uses stratified sampling across sessions, then sends each (user message, assistant response) pair to Claude as a judge
+- **Transcript quality** uses stratified sampling across sessions, then sends each (user message, assistant response) pair to an LLM judge
 - **Reasoning quality** evaluates thinking blocks with the same stratified sampling approach
 - **Regression** compares a baseline window (7 days ago → 24h ago) against the current window (last 24h) using z-score tests. Flags metrics with z < -2.0 (degraded) or z > 2.0 (improved)
 
 LLM evaluators use `temperature: 0` for deterministic scoring. Prompt versions are tracked so regression detection only compares results from matching prompt versions.
+
+### LLM Providers
+
+The evaluation system supports multiple LLM providers for judge calls. Set one API key and the system auto-detects the provider, or use `EVAL_PROVIDER` to choose explicitly.
+
+| Provider | API Key Env Var | Default Model |
+|----------|----------------|---------------|
+| **Anthropic** | `ANTHROPIC_API_KEY` | `claude-sonnet-4-20250514` |
+| **Gemini** | `GOOGLE_API_KEY` | `gemini-2.5-flash` |
+
+```bash
+# Use Anthropic (auto-detected)
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Use Gemini (auto-detected)
+export GOOGLE_API_KEY=AI...
+
+# Both keys set — force one explicitly
+export EVAL_PROVIDER=gemini
+
+# Override the model for any provider
+export EVAL_MODEL=gemini-2.5-pro
+```
+
+The `/evaluations/config` endpoint reports which providers are configured.
 
 ### Evaluation API
 
@@ -221,7 +246,7 @@ Three tables added to the existing SQLite database:
 | **Styling** | Tailwind CSS v3 | Dark industrial theme |
 | **Charts** | SVG (zero deps) | Data visualization |
 | **Transport** | WebSocket | Real-time event streaming |
-| **Evaluations** | Claude API (Sonnet) | LLM-as-judge for quality scoring |
+| **Evaluations** | Anthropic / Gemini (pluggable) | LLM-as-judge for quality scoring |
 | **Server Tests** | Bun test | DB + API + WebSocket integration tests |
 | **E2E Tests** | Playwright (Chromium) | Browser tests for dashboard, events, transcripts |
 
@@ -236,9 +261,11 @@ VITE_WS_URL=ws://localhost:4000/stream        # Client WebSocket URL
 VITE_API_URL=http://localhost:4000            # Client API URL
 VITE_MAX_EVENTS_TO_DISPLAY=300                # Max events in UI buffer
 
-# Evaluations (optional)
-ANTHROPIC_API_KEY=sk-...                      # Required for LLM-as-judge evaluators
-EVAL_MODEL=claude-sonnet-4-20250514           # Judge model (default: claude-sonnet-4-20250514)
+# LLM Evaluations (optional — set one or both)
+ANTHROPIC_API_KEY=sk-ant-...                  # Enables Anthropic provider (Claude Sonnet)
+GOOGLE_API_KEY=AI...                          # Enables Gemini provider
+EVAL_PROVIDER=                                # Force provider: anthropic | gemini (default: auto-detect)
+EVAL_MODEL=                                   # Override model (default: per-provider)
 ```
 
 ## Learn More

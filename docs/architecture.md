@@ -6,12 +6,14 @@
 
 - Hook system with 16 event types wired via `.claude/settings.json`
 - Bun HTTP + WebSocket server with SQLite persistence (WAL mode)
-- React dashboard with three tabs: Live, Insights, Transcripts
+- React dashboard with four tabs: Live, Insights, Transcripts, Evals
 - Real-time event streaming via WebSocket
 - Agent status tracking (active/idle/stopped)
 - Session transcript ingestion and viewing
 - Human-in-the-loop question/response flow
 - Insights dashboard with KPIs, donut charts, area charts, bar charts (zero chart deps)
+- LLM evaluation system with 4 evaluators (tool success, transcript quality, reasoning quality, regression detection)
+- Multi-provider LLM support (Anthropic, Gemini) for evaluation judge calls
 - Safety gate in `pre_tool_use.py` blocking dangerous commands
 
 ### Not Yet Implemented
@@ -58,10 +60,12 @@
 │  REST API ──────────── SQLite (WAL) ──────────── WebSocket         │
 │  POST /events          events table              ws://…/stream     │
 │  GET  /events/recent   messages table            broadcast on      │
-│  GET  /transcripts     indexes on source_app,    every insert      │
-│  GET  /transcripts/:id session_id, timestamp                       │
-│  POST /transcripts                                                  │
+│  GET  /transcripts     evaluation_runs           every insert      │
+│  GET  /transcripts/:id evaluation_results                          │
+│  POST /transcripts     evaluation_baselines                        │
 │  POST /events/:id/respond ─── HITL response → agent WS            │
+│  POST /evaluations/run ── Evaluators ── LLM Provider (Anthropic/  │
+│  GET  /evaluations/*      (async)       Gemini) → judge calls     │
 └────────────────────────────┬────────────────────────────────────────┘
                              │  WebSocket { type: 'event', data }
                              ▼
@@ -69,15 +73,15 @@
 │                   React Dashboard (port 5173)                      │
 │                     apps/client/src/App.tsx                         │
 │                                                                     │
-│  ┌──────────┐  ┌──────────────┐  ┌───────────────┐                │
-│  │  Live    │  │   Insights   │  │  Transcripts  │                │
-│  │  Tab     │  │   Tab        │  │  Tab          │                │
-│  │          │  │              │  │               │                │
-│  │ Timeline │  │ KPIs, Charts │  │ Session list  │                │
-│  │ Agents   │  │ Rankings     │  │ Click → view  │                │
-│  │ Chart    │  │              │  │               │                │
-│  │ Filters  │  │              │  │               │                │
-│  └──────────┘  └──────────────┘  └───────────────┘                │
+│  ┌──────────┐  ┌────────────┐  ┌─────────────┐  ┌────────────┐  │
+│  │  Live    │  │  Insights  │  │ Transcripts │  │   Evals    │  │
+│  │  Tab     │  │  Tab       │  │ Tab         │  │   Tab      │  │
+│  │          │  │            │  │             │  │            │  │
+│  │ Timeline │  │ KPIs       │  │ Session     │  │ KPIs       │  │
+│  │ Agents   │  │ Charts     │  │ list        │  │ Evaluator  │  │
+│  │ Chart    │  │ Rankings   │  │ Click→view  │  │ cards      │  │
+│  │ Filters  │  │            │  │             │  │ Run history│  │
+│  └──────────┘  └────────────┘  └─────────────┘  └────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -150,6 +154,72 @@ Stores transcript messages ingested at session end.
 
 **Indexes:** `session_id`, `timestamp`, `uuid` (UNIQUE — deduplicates on re-ingestion)
 
+#### Table: `evaluation_runs`
+
+Stores metadata for each evaluation execution.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER | Primary key, autoincrement |
+| `evaluator_type` | TEXT NOT NULL | `tool_success`, `transcript_quality`, `reasoning_quality`, `regression` |
+| `scope_type` | TEXT NOT NULL | `session`, `agent`, `global` |
+| `scope_session_id` | TEXT | Nullable — filter to specific session |
+| `scope_source_app` | TEXT | Nullable — filter to specific agent |
+| `status` | TEXT NOT NULL | `pending`, `running`, `completed`, `failed` |
+| `progress_current` | INTEGER | Items processed so far |
+| `progress_total` | INTEGER | Total items to process |
+| `summary_json` | TEXT | Aggregated results (JSON) |
+| `error_message` | TEXT | Error details if failed |
+| `model_name` | TEXT | LLM model used (for reproducibility) |
+| `prompt_version` | TEXT | Judge prompt version (for drift detection) |
+| `options_json` | TEXT | Run options snapshot (JSON) |
+| `created_at` | INTEGER NOT NULL | Epoch ms |
+| `started_at` | INTEGER | Epoch ms |
+| `completed_at` | INTEGER | Epoch ms |
+
+**Indexes:** `evaluator_type`, `status`, `created_at`
+
+#### Table: `evaluation_results`
+
+Stores individual scored items from evaluation runs.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER | Primary key, autoincrement |
+| `run_id` | INTEGER NOT NULL | FK → evaluation_runs |
+| `session_id` | TEXT NOT NULL | Agent session |
+| `source_app` | TEXT NOT NULL | Agent source app |
+| `item_type` | TEXT NOT NULL | `tool_invocation`, `assistant_message`, `thinking_block` |
+| `item_id` | TEXT NOT NULL | Event id or message uuid |
+| `numeric_score` | REAL NOT NULL | Denormalized for fast SQL aggregation |
+| `scores_json` | TEXT NOT NULL | Dimension scores (JSON) |
+| `rationale` | TEXT | LLM explanation (null for logic evals) |
+| `metadata_json` | TEXT | Tool name, message snippet, etc. (JSON) |
+| `created_at` | INTEGER NOT NULL | Epoch ms |
+
+**Indexes:** `run_id`, `session_id`
+
+#### Table: `evaluation_baselines`
+
+Snapshots of metric statistics saved by the regression evaluator for future comparisons.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INTEGER | Primary key, autoincrement |
+| `evaluator_type` | TEXT NOT NULL | Source evaluator |
+| `metric_name` | TEXT NOT NULL | e.g. `tool_success_rate`, `avg_helpfulness` |
+| `model_name` | TEXT | Judge model (for drift filtering) |
+| `prompt_version` | TEXT | Prompt version (for drift filtering) |
+| `window_start` | INTEGER NOT NULL | Epoch ms |
+| `window_end` | INTEGER NOT NULL | Epoch ms |
+| `sample_count` | INTEGER NOT NULL | Number of data points |
+| `mean_score` | REAL NOT NULL | Window mean |
+| `stddev_score` | REAL NOT NULL | Window standard deviation |
+| `percentile_json` | TEXT | `{"p25":…,"p50":…,"p75":…}` (JSON) |
+| `created_at` | INTEGER NOT NULL | Epoch ms |
+
+**Indexes:** `evaluator_type`
+
 ## Data Flow
 
 ### Event Pipeline
@@ -197,13 +267,22 @@ Stores transcript messages ingested at session end.
 | POST | `/transcripts` | Ingest transcript messages |
 | GET | `/transcripts` | List all transcript sessions with summaries |
 | GET | `/transcripts/:session_id` | Get messages for a specific session |
-| WS | `/stream` | Real-time event stream |
+| POST | `/evaluations/run` | Start an evaluation run (returns 202) |
+| GET | `/evaluations/runs` | List runs (filterable by type/status) |
+| GET | `/evaluations/runs/:id` | Single run detail |
+| GET | `/evaluations/runs/:id/results` | Paginated scored results |
+| GET | `/evaluations/summary` | Latest stats per evaluator type |
+| GET | `/evaluations/config` | Available evaluators + configured providers |
+| DELETE | `/evaluations/runs/:id` | Delete run + cascade results |
+| WS | `/stream` | Real-time event stream (includes `evaluation_progress` messages) |
 
 ### WebSocket Protocol
 
 **On connect:** Server sends `{ type: 'initial', data: HookEvent[] }` with the last 300 events.
 
 **On new event:** Server broadcasts `{ type: 'event', data: HookEvent }` to all clients.
+
+**On evaluation progress:** Server broadcasts `{ type: 'evaluation_progress', data: { run_id, status, progress_current, progress_total } }` during eval runs.
 
 **Reconnection:** Client auto-reconnects after 3 seconds on disconnect.
 
@@ -216,6 +295,7 @@ Stores transcript messages ingested at session end.
 | Live | `EventTimeline` + `AgentStatusPanel` + `LivePulseChart` | Real-time event feed with agent sidebar |
 | Insights | `InsightsPanel` | KPIs, event breakdowns, tool rankings |
 | Transcripts | `TranscriptsListPanel` | Browse and search all session transcripts |
+| Evals | `EvaluationsPanel` | Run evaluations, view scores, drill into results |
 
 ### Key Components
 
@@ -228,6 +308,10 @@ Stores transcript messages ingested at session end.
 | `SessionTranscriptPanel` | Slide-out panel showing conversation messages |
 | `FilterPanel` | Dropdown filters for source app, session, event type |
 | `ToastNotification` | Floating alert when a new agent connects |
+| `EvaluationsPanel` | Evals tab: KPI cards, evaluator cards with charts, run history |
+| `EvalRunDetailPanel` | Drill-down into individual scored results with rationale |
+| `SuccessRateChart` | Stacked bars showing tool success/failure ratios |
+| `ScoreDistributionChart` | Horizontal bars showing 1-5 score dimensions |
 
 ### Custom Hooks
 
@@ -239,6 +323,7 @@ Stores transcript messages ingested at session end.
 | `useEventEmojis` | Maps tool names to emoji icons |
 | `useInsightsData` | Aggregates KPIs, builds chart datasets |
 | `useChartData` | Buckets events into time ranges for the pulse chart |
+| `useEvaluations` | Eval state management, run triggers, WebSocket progress |
 
 ### Agent Status Logic
 
