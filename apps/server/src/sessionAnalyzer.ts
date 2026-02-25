@@ -201,7 +201,7 @@ export async function synthesizeCrossSessions(): Promise<any> {
     const result = await callLLM({
       system: CROSS_SESSION_SYSTEM,
       messages: [{ role: 'user', content: `Synthesize insights from these ${withData.length} coding sessions:\n\n${summaryLines}` }],
-      maxTokens: 1024,
+      maxTokens: 4096,
       temperature: 0,
     });
 
