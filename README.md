@@ -118,7 +118,7 @@ just client   # http://localhost:5173
 
 ### Configure Hooks
 
-Copy `.claude/settings.json` to your Claude Code project to wire hooks. All hook scripts use `uv run --script` and POST events to `http://localhost:4000/events`.
+The `.claude/settings.json` is already committed to this repo with portable paths using `$CLAUDE_PROJECT_DIR`. Just clone the repo and ensure `uv` is on your PATH — hooks will resolve automatically. All hook scripts POST events to `http://localhost:4000/events` (configurable via `OBSERVABILITY_SERVER_URL`).
 
 ### Test
 
