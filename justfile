@@ -109,6 +109,132 @@ db-restore name:
     cp "$src" "{{db_path}}"
     echo "Restored ← backups/{{name}}"
 
+# Export a session to a standalone .db file (does NOT delete from main DB)
+db-archive session_id:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "{{backup_dir}}"
+    db="{{db_path}}"
+    sid="{{session_id}}"
+    if [[ ! -f "$db" ]]; then
+      echo "No database found at $db"
+      exit 1
+    fi
+    # Check session exists
+    count=$(sqlite3 "$db" "SELECT COUNT(*) FROM events WHERE session_id='${sid}';")
+    if [[ "$count" == "0" ]]; then
+      echo "No events found for session: ${sid}"
+      exit 1
+    fi
+    msg_count=$(sqlite3 "$db" "SELECT COUNT(*) FROM messages WHERE session_id='${sid}';")
+    ts=$(date +%Y-%m-%d_%H%M%S)
+    short="${sid:0:8}"
+    archive="{{backup_dir}}/archive-${short}-${ts}.db"
+    # Create archive with same schema
+    sqlite3 "$archive" "$(sqlite3 "$db" ".schema events")"
+    sqlite3 "$archive" "$(sqlite3 "$db" ".schema messages")"
+    sqlite3 "$archive" "$(sqlite3 "$db" ".schema evaluation_results")"
+    sqlite3 "$archive" "$(sqlite3 "$db" ".schema session_analyses")"
+    # Export data
+    sqlite3 "$db" ".mode insert events" "SELECT * FROM events WHERE session_id='${sid}';" | sqlite3 "$archive"
+    sqlite3 "$db" ".mode insert messages" "SELECT * FROM messages WHERE session_id='${sid}';" | sqlite3 "$archive"
+    sqlite3 "$db" ".mode insert evaluation_results" "SELECT * FROM evaluation_results WHERE session_id='${sid}';" | sqlite3 "$archive"
+    sqlite3 "$db" ".mode insert session_analyses" "SELECT * FROM session_analyses WHERE session_id='${sid}';" | sqlite3 "$archive"
+    archive_size=$(du -h "$archive" | cut -f1)
+    echo "Exported session ${short}..."
+    echo "  Events:   ${count}"
+    echo "  Messages: ${msg_count}"
+    echo "  File:     backups/$(basename "$archive") (${archive_size})"
+    echo ""
+    echo "Data is still in the main database."
+    echo "To remove it: just db-archive-delete {{session_id}}"
+
+# Delete a session from the main DB (run db-archive first to keep a copy)
+db-archive-delete session_id:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    db="{{db_path}}"
+    sid="{{session_id}}"
+    if [[ ! -f "$db" ]]; then
+      echo "No database found at $db"
+      exit 1
+    fi
+    count=$(sqlite3 "$db" "SELECT COUNT(*) FROM events WHERE session_id='${sid}';")
+    if [[ "$count" == "0" ]]; then
+      echo "No events found for session: ${sid}"
+      exit 1
+    fi
+    msg_count=$(sqlite3 "$db" "SELECT COUNT(*) FROM messages WHERE session_id='${sid}';")
+    short="${sid:0:8}"
+    echo "This will delete session ${short}... from the main database:"
+    echo "  Events:   ${count}"
+    echo "  Messages: ${msg_count}"
+    read -rp "Proceed? [y/N] " yn
+    case "$yn" in
+      [Yy]*)
+        sqlite3 "$db" "
+          DELETE FROM events WHERE session_id='${sid}';
+          DELETE FROM messages WHERE session_id='${sid}';
+          DELETE FROM evaluation_results WHERE session_id='${sid}';
+          DELETE FROM session_analyses WHERE session_id='${sid}';
+        "
+        echo "Deleted. Run 'just db-vacuum' to reclaim disk space."
+        ;;
+      *) echo "Cancelled." ;;
+    esac
+
+# Reclaim disk space after deletes
+db-vacuum:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    db="{{db_path}}"
+    if [[ ! -f "$db" ]]; then
+      echo "No database found at $db"
+      exit 1
+    fi
+    before=$(du -h "$db" | cut -f1)
+    sqlite3 "$db" "VACUUM;"
+    after=$(du -h "$db" | cut -f1)
+    echo "Vacuum complete: ${before} → ${after}"
+
+# Print database statistics
+db-stats:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    db="{{db_path}}"
+    if [[ ! -f "$db" ]]; then
+      echo "No database found"
+      exit 0
+    fi
+    size=$(du -h "$db" | cut -f1)
+    echo "Database: $db (${size})"
+    echo ""
+    sqlite3 "$db" "
+      SELECT '  events:              ' || COUNT(*) FROM events;
+      SELECT '  messages:            ' || COUNT(*) FROM messages;
+      SELECT '  evaluation_runs:     ' || COUNT(*) FROM evaluation_runs;
+      SELECT '  evaluation_results:  ' || COUNT(*) FROM evaluation_results;
+      SELECT '  evaluation_baselines:' || COUNT(*) FROM evaluation_baselines;
+      SELECT '  session_analyses:    ' || COUNT(*) FROM session_analyses;
+      SELECT '  cross_session_insights: ' || COUNT(*) FROM cross_session_insights;
+    "
+    echo ""
+    sqlite3 "$db" "
+      SELECT '  Sessions:     ' || COUNT(DISTINCT session_id) FROM events;
+      SELECT '  Source apps:  ' || GROUP_CONCAT(source_app, ', ') FROM (SELECT DISTINCT source_app FROM events ORDER BY source_app);
+      SELECT '  Oldest event: ' || datetime(MIN(timestamp)/1000, 'unixepoch', 'localtime') FROM events;
+      SELECT '  Newest event: ' || datetime(MAX(timestamp)/1000, 'unixepoch', 'localtime') FROM events;
+    "
+    echo ""
+    # Backup info
+    if [[ -d "{{backup_dir}}" ]] && [[ -n "$(ls -A "{{backup_dir}}" 2>/dev/null)" ]]; then
+      backup_count=$(ls "{{backup_dir}}"/*.db 2>/dev/null | wc -l | tr -d ' ')
+      backup_size=$(du -sh "{{backup_dir}}" | cut -f1)
+      echo "  Backups: ${backup_count} files (${backup_size} total)"
+    else
+      echo "  Backups: none"
+    fi
+
 # --- Testing ---
 
 test:

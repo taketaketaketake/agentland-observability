@@ -25,11 +25,34 @@ just db-restore "events-before-schema-change-2025-02-25_143000.db"
 just db-reset
 ```
 
+### Archive & cleanup
+
+```bash
+# Export a session to a standalone .db file (non-destructive)
+just db-archive "session-id-here"
+# → backups/archive-abcd1234-2025-02-25_143000.db
+
+# Delete a session from the main DB (prompts for confirmation)
+just db-archive-delete "session-id-here"
+
+# Reclaim disk space after deletes
+just db-vacuum
+
+# Print table row counts, file size, date range, backup info
+just db-stats
+```
+
+### Auto-backup on start
+
+Every time you run `just start`, the current database is automatically backed up as `events-auto-{timestamp}.db`. Only the 5 most recent auto-backups are kept — older ones are pruned automatically.
+
 ### How it works
 
 - Backups are plain SQLite file copies stored in `backups/` at the repo root (gitignored).
 - Each backup filename includes an optional tag and a timestamp: `events-{tag}-{YYYY-MM-DD_HHMMSS}.db`
 - `db-restore` automatically backs up the current database as `events-pre-restore-{timestamp}.db` before overwriting, so you can always undo a restore.
+- `db-archive` exports a session's events, messages, eval results, and analyses to a standalone `.db` file. The data stays in the main database until you explicitly run `db-archive-delete`.
+- `db-vacuum` runs SQLite's VACUUM command to reclaim space after deleting data.
 - `db-reset` deletes the database and WAL/SHM files. The server recreates tables on next startup.
 
 ### When to back up
