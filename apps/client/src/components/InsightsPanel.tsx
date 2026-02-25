@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { HookEvent, HistoricalInsightsResponse, AreaPoint, BarItem, DonutSlice } from '../types';
 import { useInsightsData } from '../hooks/useInsightsData';
 import { useHistoricalInsights } from '../hooks/useHistoricalInsights';
@@ -6,6 +6,8 @@ import { useCrossSessionInsights } from '../hooks/useCrossSessionInsights';
 import DonutChart from './charts/DonutChart';
 import AreaChart from './charts/AreaChart';
 import BarChart from './charts/BarChart';
+import MultiSelectDropdown from './MultiSelectDropdown';
+import { API_URL } from '../config';
 
 interface InsightsPanelProps {
   events: HookEvent[];
@@ -260,10 +262,60 @@ const OUTCOME_CHART_COLORS: Record<string, string> = {
   unclear: '#60a5fa',
 };
 
-function AIInsights() {
-  const { data, loading, error } = useCrossSessionInsights();
+interface AnalysisOption {
+  value: string;
+  label: string;
+}
 
-  if (loading) {
+function AIInsights() {
+  const { data, meta, loading, error, fetchInsights } = useCrossSessionInsights();
+  const [sessionOptions, setSessionOptions] = useState<AnalysisOption[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [lastSynthesizedIds, setLastSynthesizedIds] = useState<string[]>([]);
+
+  // Fetch available analyzed sessions for the dropdown
+  useEffect(() => {
+    fetch(`${API_URL}/session-analysis?status=completed&limit=200`)
+      .then(r => r.ok ? r.json() : [])
+      .then((analyses: any[]) => {
+        const opts: AnalysisOption[] = analyses
+          .filter((a: any) => a.analysis_json)
+          .map((a: any) => {
+            const parsed = typeof a.analysis_json === 'string' ? JSON.parse(a.analysis_json) : a.analysis_json;
+            const summary = (parsed?.task_summary || 'No summary').substring(0, 60);
+            return {
+              value: a.session_id,
+              label: `${a.source_app}:${a.session_id.substring(0, 8)} — ${summary}`,
+            };
+          });
+        setSessionOptions(opts);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync dropdown selection to meta.session_ids once initial fetch completes
+  useEffect(() => {
+    if (meta?.session_ids && lastSynthesizedIds.length === 0) {
+      setSelectedIds(meta.session_ids);
+      setLastSynthesizedIds(meta.session_ids);
+    }
+  }, [meta, lastSynthesizedIds.length]);
+
+  const selectionChanged = (() => {
+    if (selectedIds.length === 0 && lastSynthesizedIds.length === 0) return false;
+    if (selectedIds.length !== lastSynthesizedIds.length) return true;
+    const sorted1 = [...selectedIds].sort();
+    const sorted2 = [...lastSynthesizedIds].sort();
+    return sorted1.some((id, i) => id !== sorted2[i]);
+  })();
+
+  const handleRegenerate = () => {
+    const ids = selectedIds.length === sessionOptions.length ? undefined : selectedIds;
+    fetchInsights(ids);
+    setLastSynthesizedIds(selectedIds);
+  };
+
+  if (loading && !data) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="flex items-center gap-2 text-sm text-[var(--theme-text-tertiary)] font-mono">
@@ -274,7 +326,7 @@ function AIInsights() {
     );
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-sm text-[var(--theme-text-tertiary)] font-mono">Failed to load: {error}</p>
@@ -350,6 +402,40 @@ function AIInsights() {
 
   return (
     <div className="flex-1 overflow-y-auto p-4 mobile:p-3">
+      {/* ─── Session Filter Bar ─── */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <MultiSelectDropdown
+          options={sessionOptions}
+          selected={selectedIds}
+          onChange={setSelectedIds}
+          placeholder="All sessions"
+        />
+        <button
+          type="button"
+          disabled={selectedIds.length < 2 || loading}
+          onClick={handleRegenerate}
+          className={`text-[11px] font-mono px-3 py-1 rounded-md border transition-colors ${
+            selectionChanged && selectedIds.length >= 2 && !loading
+              ? 'border-purple-500 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 cursor-pointer'
+              : 'border-[var(--theme-border-secondary)] text-[var(--theme-text-quaternary)] cursor-not-allowed opacity-50'
+          }`}
+        >
+          {loading ? (
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />
+              Synthesizing...
+            </span>
+          ) : (
+            'Regenerate'
+          )}
+        </button>
+        {meta && (
+          <span className="text-[10px] font-mono text-[var(--theme-text-quaternary)]">
+            {meta.session_count} session{meta.session_count !== 1 ? 's' : ''} used{meta.cached ? ' (cached)' : ''}
+          </span>
+        )}
+      </div>
+
       {/* ─── KPI Row ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <KpiCard label="Analyzed" value={totalAnalyzed.toString()} />

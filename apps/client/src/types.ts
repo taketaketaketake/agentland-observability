@@ -270,6 +270,12 @@ export interface SessionAnalysis {
   completed_at: number | null;
 }
 
+export interface CrossSessionMeta {
+  session_ids: string[];
+  session_count: number;
+  cached: boolean;
+}
+
 export interface CrossSessionInsights {
   overall_summary: string;
   common_patterns: string[];
@@ -280,6 +286,7 @@ export interface CrossSessionInsights {
   outcome_distribution: Record<string, number>;
   recommendations: string[];
   productivity_assessment: string;
+  _meta?: CrossSessionMeta;
   error?: string;
   message?: string;
 }

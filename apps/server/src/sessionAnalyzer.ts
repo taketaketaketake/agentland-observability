@@ -173,11 +173,21 @@ Respond with ONLY a JSON object (no markdown fences, no explanation):
 
 For quality_distribution: high=4-5, medium=3, low=1-2.`;
 
-export async function synthesizeCrossSessions(): Promise<any> {
+export async function synthesizeCrossSessions(filterSessionIds?: string[]): Promise<any> {
+  // Determine cache key
+  const cacheKey = filterSessionIds
+    ? `filtered:${[...filterSessionIds].sort().join(',')}`
+    : 'latest';
+
   // Check cache
-  const cached = getCrossSessionInsight('latest');
+  const cached = getCrossSessionInsight(cacheKey);
   if (cached && (Date.now() - cached.created_at) < CROSS_SESSION_TTL_MS) {
-    return JSON.parse(cached.analysis_json);
+    const parsed = JSON.parse(cached.analysis_json);
+    const sessionIds = parsed._meta?.session_ids ?? [];
+    return {
+      ...parsed,
+      _meta: { session_ids: sessionIds, session_count: sessionIds.length, cached: true },
+    };
   }
 
   if (!isAnyProviderConfigured()) {
@@ -185,11 +195,18 @@ export async function synthesizeCrossSessions(): Promise<any> {
   }
 
   const analyses = listSessionAnalyses({ status: 'completed', limit: 50 });
-  const withData = analyses.filter(a => a.analysis_json);
+  let withData = analyses.filter(a => a.analysis_json);
+
+  // Apply session filter if provided
+  if (filterSessionIds) {
+    withData = withData.filter(a => filterSessionIds.includes(a.session_id));
+  }
 
   if (withData.length < 2) {
     return { error: 'insufficient_data', message: `Need at least 2 analyzed sessions. Currently have ${withData.length}.` };
   }
+
+  const usedSessionIds = withData.map(a => a.session_id);
 
   // Build summaries for the LLM
   const summaryLines = withData.map((a, i) => {
@@ -210,13 +227,18 @@ export async function synthesizeCrossSessions(): Promise<any> {
       return { error: 'parse_error', message: error || 'Failed to parse LLM response' };
     }
 
-    upsertCrossSessionInsight('latest', {
-      analysis_json: JSON.stringify(parsed),
+    // Store session_ids in the cached JSON so we can recover them
+    const toCache = { ...parsed, _meta: { session_ids: usedSessionIds } };
+    upsertCrossSessionInsight(cacheKey, {
+      analysis_json: JSON.stringify(toCache),
       model_name: result.model,
       session_count: withData.length,
     });
 
-    return parsed;
+    return {
+      ...parsed,
+      _meta: { session_ids: usedSessionIds, session_count: usedSessionIds.length, cached: false },
+    };
   } catch (err: any) {
     console.error(`[session-analyzer] Cross-session synthesis failed:`, err.message);
     return { error: 'llm_error', message: err.message };

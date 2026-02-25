@@ -319,7 +319,9 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
       // GET /insights/ai
       if (url.pathname === '/insights/ai' && req.method === 'GET') {
         try {
-          const insights = await synthesizeCrossSessions();
+          const rawIds = url.searchParams.get('session_ids');
+          const filterSessionIds = rawIds ? rawIds.split(',').filter(Boolean) : undefined;
+          const insights = await synthesizeCrossSessions(filterSessionIds);
           return new Response(JSON.stringify(insights), {
             headers: { ...headers, 'Content-Type': 'application/json' },
           });
