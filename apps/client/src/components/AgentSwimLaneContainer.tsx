@@ -48,19 +48,19 @@ export default function AgentSwimLaneContainer({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">
-          Agent Swim Lanes
+        <span className="text-[10px] font-mono font-semibold tracking-widest uppercase text-[var(--theme-text-tertiary)]">
+          Swim Lanes
         </span>
         <button
           onClick={() => onUpdateSelectedAgents([])}
-          className="text-xs text-[var(--theme-accent-error)] hover:underline"
+          className="text-[10px] font-mono text-[var(--theme-accent-error)] hover:underline"
         >
           Clear all
         </button>
       </div>
 
       <div
-        className="grid gap-3 pb-2"
+        className="grid gap-2"
         style={{ gridTemplateColumns: `repeat(${selectedAgents.length}, minmax(0, 1fr))` }}
       >
         {selectedAgents.map((agent) => {
@@ -70,41 +70,43 @@ export default function AgentSwimLaneContainer({
           return (
             <div
               key={agent}
-              className="min-w-0 rounded-lg border bg-[var(--theme-bg-primary)] overflow-hidden"
-              style={{ borderColor: color, borderTopWidth: 3 }}
+              className="min-w-0 rounded-lg border border-[var(--theme-border-primary)] bg-[var(--theme-bg-primary)] overflow-hidden"
+              style={{ borderTopColor: color, borderTopWidth: 2 }}
             >
               {/* Lane header */}
-              <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--theme-bg-secondary)]">
-                <span className="text-xs font-semibold truncate" style={{ color }}>
+              <div className="flex items-center justify-between px-2.5 py-1.5 bg-[var(--theme-bg-surface)]">
+                <span className="text-[10px] font-mono font-semibold truncate" style={{ color }}>
                   {agent}
                 </span>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-[var(--theme-text-tertiary)]">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-mono text-[var(--theme-text-quaternary)] tabular-nums">
                     {agentEvts.length}
                   </span>
                   <button
                     onClick={() => removeAgent(agent)}
-                    className="text-xs text-[var(--theme-text-tertiary)] hover:text-[var(--theme-accent-error)]"
+                    className="text-[var(--theme-text-quaternary)] hover:text-[var(--theme-accent-error)] transition-colors"
                   >
-                    {'\u2715'}
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
               </div>
 
               {/* Lane events */}
-              <div className="max-h-32 overflow-y-auto">
+              <div className="max-h-28 overflow-y-auto">
                 {agentEvts.length === 0 ? (
-                  <div className="text-center text-[10px] text-[var(--theme-text-quaternary)] py-3">
+                  <div className="text-center text-[9px] font-mono text-[var(--theme-text-quaternary)] py-3">
                     No events in window
                   </div>
                 ) : (
                   agentEvts.slice(-20).map((evt) => (
                     <div
                       key={evt.id || evt.timestamp}
-                      className="flex items-center gap-1 px-2 py-0.5 text-[10px] border-b border-[var(--theme-border-primary)] last:border-b-0"
+                      className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono border-b border-[var(--theme-border-primary)] last:border-b-0 hover:bg-[var(--theme-hover-bg)] transition-colors"
                     >
-                      <span>{getEventEmoji(evt.hook_event_type)}</span>
-                      <span className="text-[var(--theme-text-secondary)] truncate">
+                      <span className="text-xs">{getEventEmoji(evt.hook_event_type)}</span>
+                      <span className="text-[var(--theme-text-tertiary)] truncate">
                         {getEventSummary(evt)}
                       </span>
                     </div>

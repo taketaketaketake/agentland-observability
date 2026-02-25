@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { HookEvent } from '../types';
 import { useAgentStatus, type AgentStatus } from '../hooks/useAgentStatus';
 import { useEventColors } from '../hooks/useEventColors';
@@ -9,83 +9,131 @@ interface AgentStatusPanelProps {
 }
 
 function formatTimeSince(ms: number): string {
-  if (ms < 1000) return 'just now';
+  if (ms < 1000) return 'now';
   const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.floor(minutes / 60)}h ago`;
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.floor(minutes / 60)}h`;
 }
 
-const STATUS_CONFIG: Record<AgentStatus, { dot: string; label: string; dotClass: string }> = {
-  active: { dot: '', label: 'Active', dotClass: 'bg-green-500' },
-  idle: { dot: '', label: 'Idle', dotClass: 'bg-amber-400' },
-  stopped: { dot: '', label: 'Stopped', dotClass: 'bg-gray-400' },
+const STATUS_CONFIG: Record<AgentStatus, { label: string; color: string; glow: string }> = {
+  active: { label: 'ACTIVE', color: 'var(--theme-accent-success)', glow: 'rgba(0, 229, 160, 0.15)' },
+  idle: { label: 'IDLE', color: 'var(--theme-accent-warning)', glow: 'rgba(255, 178, 36, 0.12)' },
+  stopped: { label: 'STOPPED', color: 'var(--theme-text-tertiary)', glow: 'transparent' },
 };
 
 export default function AgentStatusPanel({ events, onSelectAgent }: AgentStatusPanelProps) {
   const agents = useAgentStatus(events);
   const { getHexColorForApp } = useEventColors();
-  const [collapsed, setCollapsed] = useState(false);
+  const [, setTick] = useState(0);
 
-  if (agents.length === 0) return null;
+  // Update time-since-last-event every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <div className="bg-[var(--theme-bg-primary)] border-b border-[var(--theme-border-primary)]">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[var(--theme-text-secondary)] hover:bg-[var(--theme-hover-bg)] transition-colors"
-      >
-        <span className="text-[10px]">{collapsed ? '\u25B6' : '\u25BC'}</span>
-        <span>Agents ({agents.length})</span>
-      </button>
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--theme-border-primary)]">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono font-semibold tracking-widest uppercase text-[var(--theme-text-tertiary)]">
+            Agents
+          </span>
+          {agents.length > 0 && (
+            <span className="text-[10px] font-mono text-[var(--theme-text-quaternary)] bg-[var(--theme-bg-tertiary)] px-1.5 py-0.5 rounded">
+              {agents.length}
+            </span>
+          )}
+        </div>
+      </div>
 
-      {/* Cards */}
-      {!collapsed && (
-        <div className="flex gap-2 px-3 pb-2 overflow-x-auto">
-          {agents.map((agent) => {
+      {/* Agent List */}
+      <div className="flex-1 overflow-y-auto py-1.5">
+        {agents.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+            <div className="w-8 h-8 rounded-full border border-dashed border-[var(--theme-border-secondary)] flex items-center justify-center mb-3">
+              <svg className="w-3.5 h-3.5 text-[var(--theme-text-quaternary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </div>
+            <span className="text-[11px] text-[var(--theme-text-tertiary)]">No agents connected</span>
+            <span className="text-[10px] text-[var(--theme-text-quaternary)] mt-0.5">Start a Claude session to begin</span>
+          </div>
+        ) : (
+          agents.map((agent, i) => {
             const config = STATUS_CONFIG[agent.status];
-            const borderColor = getHexColorForApp(agent.sourceApp);
+            const accentColor = getHexColorForApp(agent.sourceApp);
 
             return (
               <button
                 key={agent.agentId}
                 onClick={() => onSelectAgent(agent.sourceApp)}
-                className="flex-shrink-0 rounded-lg border border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)] hover:bg-[var(--theme-hover-bg)] transition-colors text-left px-3 py-2 min-w-[240px] max-w-[320px]"
-                style={{ borderLeftColor: borderColor, borderLeftWidth: 3 }}
+                className="w-full text-left px-3 py-2 hover:bg-[var(--theme-hover-bg)] transition-all duration-150 group"
+                style={{ animationDelay: `${i * 50}ms` }}
                 title={`Click to toggle swim lane for ${agent.sourceApp}`}
               >
-                {/* Top row: status dot + agent ID + event count */}
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2 flex-shrink-0">
-                    {agent.status === 'active' && (
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${config.dotClass} opacity-75`} />
-                    )}
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${config.dotClass}`} />
-                  </span>
-                  <span className="text-xs font-mono font-medium text-[var(--theme-text-primary)] truncate">
-                    {agent.agentId}
-                  </span>
-                  <span className="ml-auto text-[10px] text-[var(--theme-text-quaternary)] flex-shrink-0">
-                    {agent.eventCount} events
-                  </span>
-                </div>
+                <div
+                  className="rounded-lg border p-2.5 transition-all duration-200 group-hover:border-[var(--theme-border-tertiary)]"
+                  style={{
+                    borderColor: agent.status === 'active' ? `${accentColor}33` : 'var(--theme-border-primary)',
+                    background: agent.status === 'active' ? `${accentColor}08` : 'var(--theme-bg-surface)',
+                    boxShadow: agent.status === 'active' ? `0 0 20px -5px ${accentColor}20` : 'none',
+                  }}
+                >
+                  {/* Status row */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="relative flex h-2 w-2 flex-shrink-0">
+                      {agent.status === 'active' && (
+                        <span
+                          className="status-pulse absolute inline-flex h-full w-full rounded-full opacity-50"
+                          style={{ backgroundColor: config.color }}
+                        />
+                      )}
+                      <span
+                        className="relative inline-flex rounded-full h-2 w-2"
+                        style={{ backgroundColor: config.color }}
+                      />
+                    </span>
+                    <span
+                      className="text-[9px] font-mono font-semibold tracking-widest uppercase"
+                      style={{ color: config.color }}
+                    >
+                      {config.label}
+                    </span>
+                    <span className="ml-auto text-[10px] font-mono text-[var(--theme-text-quaternary)] tabular-nums">
+                      {formatTimeSince(agent.timeSinceLastEvent)}
+                    </span>
+                  </div>
 
-                {/* Bottom row: summary + time */}
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[11px] text-[var(--theme-text-tertiary)] truncate flex-1">
-                    {agent.lastSummary}
-                  </span>
-                  <span className="text-[10px] text-[var(--theme-text-quaternary)] flex-shrink-0">
-                    {formatTimeSince(agent.timeSinceLastEvent)}
-                  </span>
+                  {/* Agent ID */}
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span
+                      className="w-1 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: accentColor }}
+                    />
+                    <span className="text-xs font-mono font-medium text-[var(--theme-text-primary)] truncate">
+                      {agent.agentId}
+                    </span>
+                  </div>
+
+                  {/* Summary + count */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-[var(--theme-text-tertiary)] truncate flex-1">
+                      {agent.lastSummary}
+                    </span>
+                    <span className="text-[9px] font-mono text-[var(--theme-text-quaternary)] flex-shrink-0 tabular-nums">
+                      {agent.eventCount}
+                    </span>
+                  </div>
                 </div>
               </button>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
     </div>
   );
 }

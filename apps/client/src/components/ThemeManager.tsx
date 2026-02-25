@@ -6,53 +6,55 @@ interface ThemeManagerProps {
 export default function ThemeManager({ isOpen, onClose }: ThemeManagerProps) {
   if (!isOpen) return null;
 
+  const vars = [
+    ['--theme-primary', 'Primary accent'],
+    ['--theme-bg-primary', 'Background'],
+    ['--theme-bg-secondary', 'Surface'],
+    ['--theme-text-primary', 'Text'],
+    ['--theme-accent-success', 'Success'],
+    ['--theme-accent-error', 'Error'],
+    ['--theme-accent-warning', 'Warning'],
+    ['--theme-accent-info', 'Info'],
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[var(--theme-bg-primary)] rounded-xl shadow-2xl w-[90vw] max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-[var(--theme-bg-secondary)] rounded-xl border border-[var(--theme-border-secondary)] shadow-2xl w-[90vw] max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)]">
-          <h2 className="text-sm font-semibold text-[var(--theme-text-primary)]">
-            {'\u{1F3A8}'} Theme Manager
-          </h2>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border-primary)]">
+          <span className="text-xs font-mono font-medium text-[var(--theme-text-primary)]">
+            Theme
+          </span>
           <button
             onClick={onClose}
-            className="text-lg text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors"
+            className="text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors p-1"
           >
-            {'\u2715'}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="text-center text-[var(--theme-text-tertiary)]">
-            <div className="text-4xl mb-3">{'\u{1F3A8}'}</div>
-            <p className="text-sm">Theme customization coming soon.</p>
-            <p className="text-xs mt-1">
-              Edit CSS variables in <code className="bg-[var(--theme-bg-tertiary)] px-1 rounded">index.css</code> to customize the look.
-            </p>
+        <div className="flex-1 overflow-y-auto p-4">
+          <p className="text-[11px] font-mono text-[var(--theme-text-tertiary)] mb-4">
+            Edit CSS variables in <code className="text-[var(--theme-primary)] bg-[var(--theme-bg-primary)] px-1 py-0.5 rounded text-[10px]">index.css</code> to customize.
+          </p>
 
-            <div className="mt-6 text-left max-w-md mx-auto">
-              <h3 className="text-xs font-semibold text-[var(--theme-text-secondary)] mb-2">Current Theme Variables</h3>
-              <div className="space-y-1 text-xs font-mono">
-                {[
-                  ['--theme-primary', 'Primary color'],
-                  ['--theme-bg-primary', 'Background'],
-                  ['--theme-bg-secondary', 'Secondary bg'],
-                  ['--theme-text-primary', 'Text color'],
-                  ['--theme-accent-success', 'Success'],
-                  ['--theme-accent-error', 'Error'],
-                ].map(([varName, label]) => (
-                  <div key={varName} className="flex items-center gap-2">
-                    <div
-                      className="w-4 h-4 rounded border border-[var(--theme-border-primary)]"
-                      style={{ backgroundColor: `var(${varName})` }}
-                    />
-                    <span className="text-[var(--theme-text-tertiary)]">{label}:</span>
-                    <span className="text-[var(--theme-text-secondary)]">{varName}</span>
-                  </div>
-                ))}
+          <div className="space-y-1.5">
+            {vars.map(([varName, label]) => (
+              <div key={varName} className="flex items-center gap-2.5 py-1">
+                <div
+                  className="w-4 h-4 rounded border border-[var(--theme-border-secondary)] flex-shrink-0"
+                  style={{ backgroundColor: `var(${varName})` }}
+                />
+                <span className="text-[10px] font-mono text-[var(--theme-text-tertiary)] w-16">{label}</span>
+                <span className="text-[10px] font-mono text-[var(--theme-text-quaternary)]">{varName}</span>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>

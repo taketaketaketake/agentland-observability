@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Filters, TimeRange } from './types';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useEventColors } from './hooks/useEventColors';
+import { useAgentStatus } from './hooks/useAgentStatus';
 import EventTimeline from './components/EventTimeline';
 import FilterPanel from './components/FilterPanel';
 import StickScrollButton from './components/StickScrollButton';
 import LivePulseChart from './components/LivePulseChart';
-import ThemeManager from './components/ThemeManager';
 import ToastNotification from './components/ToastNotification';
 import AgentSwimLaneContainer from './components/AgentSwimLaneContainer';
 import AgentStatusPanel from './components/AgentStatusPanel';
@@ -21,15 +21,16 @@ interface Toast {
 export default function App() {
   const { events, isConnected, error, clearEvents } = useWebSocket(WS_URL);
   const { getHexColorForApp } = useEventColors();
+  const agents = useAgentStatus(events);
 
   const [filters, setFilters] = useState<Filters>({ sourceApp: '', sessionId: '', eventType: '' });
   const [stickToBottom, setStickToBottom] = useState(true);
-  const [showThemeManager, setShowThemeManager] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [uniqueAppNames, setUniqueAppNames] = useState<string[]>([]);
   const [allAppNames, setAllAppNames] = useState<string[]>([]);
   const [selectedAgentLanes, setSelectedAgentLanes] = useState<string[]>([]);
   const [, setCurrentTimeRange] = useState<TimeRange>('1m');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -70,132 +71,136 @@ export default function App() {
     setSelectedAgentLanes([]);
   }, [clearEvents]);
 
+  const activeCount = agents.filter(a => a.status === 'active').length;
+  const idleCount = agents.filter(a => a.status === 'idle').length;
+
   return (
-    <div className="h-screen flex flex-col bg-[var(--theme-bg-secondary)]">
-      {/* Header */}
-      <header className="short:hidden bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-primary-light)] shadow-lg border-b-2 border-[var(--theme-primary-dark)]">
-        <div className="px-3 py-4 mobile:py-1.5 mobile:px-2 flex items-center justify-between mobile:gap-2">
-          {/* Title */}
-          <div className="mobile:hidden">
-            <h1 className="text-2xl font-bold text-white drop-shadow-lg">
-              Multi-Agent Observability
-            </h1>
+    <div className="h-screen flex flex-col overflow-hidden bg-[var(--theme-bg-primary)]">
+      {/* ─── Top Command Bar ─── */}
+      <header className="short:hidden flex-shrink-0 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)]">
+        <div className="flex items-center justify-between px-4 py-2.5 mobile:px-3 mobile:py-2">
+          {/* Left: Logo + Status */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-2 h-2 rounded-full bg-[var(--theme-primary)] animate-live-blink" />
+              <h1 className="text-sm font-semibold tracking-tight text-[var(--theme-text-primary)]" style={{ fontFamily: "'Outfit', sans-serif" }}>
+                OBSERVABILITY
+              </h1>
+            </div>
+
+            {/* Connection indicator */}
+            <div className={`flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-full border ${
+              isConnected
+                ? 'text-[var(--theme-accent-success)] border-[rgba(0,229,160,0.2)] bg-[rgba(0,229,160,0.05)]'
+                : 'text-[var(--theme-accent-error)] border-[rgba(255,107,107,0.2)] bg-[rgba(255,107,107,0.05)]'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-[var(--theme-accent-success)]' : 'bg-[var(--theme-accent-error)]'}`} />
+              {isConnected ? 'LIVE' : 'OFFLINE'}
+            </div>
           </div>
 
-          {/* Connection Status */}
-          <div className="flex items-center space-x-1.5">
-            {isConnected ? (
-              <div className="flex items-center space-x-1.5">
-                <span className="relative flex h-3 w-3 mobile:h-2 mobile:w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-3 w-3 mobile:h-2 mobile:w-2 bg-green-500" />
-                </span>
-                <span className="text-base mobile:text-xs text-white font-semibold drop-shadow-md mobile:hidden">
-                  Connected
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-1.5">
-                <span className="relative flex h-3 w-3 mobile:h-2 mobile:w-2">
-                  <span className="relative inline-flex rounded-full h-3 w-3 mobile:h-2 mobile:w-2 bg-red-500" />
-                </span>
-                <span className="text-base mobile:text-xs text-white font-semibold drop-shadow-md mobile:hidden">
-                  Disconnected
-                </span>
-              </div>
-            )}
+          {/* Center: Stats */}
+          <div className="hidden sm:flex items-center gap-3">
+            <StatPill label="Events" value={events.length} />
+            <StatPill label="Active" value={activeCount} color="var(--theme-accent-success)" />
+            {idleCount > 0 && <StatPill label="Idle" value={idleCount} color="var(--theme-accent-warning)" />}
+            <StatPill label="Agents" value={agents.length} color="var(--theme-accent-info)" />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center space-x-2 mobile:space-x-1">
-            <span className="text-base mobile:text-xs text-white font-semibold drop-shadow-md bg-[var(--theme-primary-dark)] px-3 py-1.5 mobile:px-2 mobile:py-0.5 rounded-full border border-white/30">
-              {events.length}
-            </span>
-
-            <button
-              onClick={handleClear}
-              className="p-3 mobile:p-1 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 backdrop-blur-sm shadow-lg hover:shadow-xl"
-              title="Clear events"
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1.5">
+            <HeaderButton
+              onClick={() => setSidebarOpen(v => !v)}
+              active={sidebarOpen}
+              title="Toggle agents panel"
             >
-              <span className="text-2xl mobile:text-base">{'\u{1F5D1}\uFE0F'}</span>
-            </button>
-
-            <button
-              onClick={() => setShowFilters((v) => !v)}
-              className="p-3 mobile:p-1 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 backdrop-blur-sm shadow-lg hover:shadow-xl"
-              title={showFilters ? 'Hide filters' : 'Show filters'}
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </HeaderButton>
+            <HeaderButton
+              onClick={() => setShowFilters(v => !v)}
+              active={showFilters}
+              title="Toggle filters"
             >
-              <span className="text-2xl mobile:text-base">{'\u{1F4CA}'}</span>
-            </button>
-
-            <button
-              onClick={() => setShowThemeManager(true)}
-              className="p-3 mobile:p-1 rounded-lg bg-white/20 hover:bg-white/30 transition-all duration-200 border border-white/30 hover:border-white/50 backdrop-blur-sm shadow-lg hover:shadow-xl"
-              title="Open theme manager"
-            >
-              <span className="text-2xl mobile:text-base">{'\u{1F3A8}'}</span>
-            </button>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+            </HeaderButton>
+            <HeaderButton onClick={handleClear} title="Clear events">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </HeaderButton>
           </div>
         </div>
       </header>
 
-      {/* Filters */}
+      {/* ─── Filters Bar ─── */}
       {showFilters && (
         <FilterPanel filters={filters} onFiltersChange={setFilters} />
       )}
 
-      {/* Live Pulse Chart */}
-      <LivePulseChart
-        events={events}
-        filters={filters}
-        onUpdateUniqueApps={setUniqueAppNames}
-        onUpdateAllApps={setAllAppNames}
-        onUpdateTimeRange={setCurrentTimeRange}
-      />
+      {/* ─── Main Content ─── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ─── Sidebar: Agent Panel ─── */}
+        {sidebarOpen && (
+          <aside className="w-64 mobile:w-56 flex-shrink-0 border-r border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)] flex flex-col overflow-hidden">
+            <AgentStatusPanel events={events} onSelectAgent={toggleAgentLane} />
+          </aside>
+        )}
 
-      {/* Agent Status Cards */}
-      <AgentStatusPanel events={events} onSelectAgent={toggleAgentLane} />
-
-      {/* Agent Swim Lanes */}
-      {selectedAgentLanes.length > 0 && (
-        <div className="w-full bg-[var(--theme-bg-secondary)] px-3 py-4 mobile:px-2 mobile:py-2 overflow-hidden">
-          <AgentSwimLaneContainer
-            selectedAgents={selectedAgentLanes}
+        {/* ─── Main Area ─── */}
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Chart */}
+          <LivePulseChart
             events={events}
-            timeRange="1m"
-            onUpdateSelectedAgents={setSelectedAgentLanes}
+            filters={filters}
+            onUpdateUniqueApps={setUniqueAppNames}
+            onUpdateAllApps={setAllAppNames}
+            onUpdateTimeRange={setCurrentTimeRange}
           />
-        </div>
-      )}
 
-      {/* Timeline */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <EventTimeline
-          events={events}
-          filters={filters}
-          uniqueAppNames={uniqueAppNames}
-          allAppNames={allAppNames}
-          stickToBottom={stickToBottom}
-          onStickToBottomChange={setStickToBottom}
-          onSelectAgent={toggleAgentLane}
-        />
+          {/* Swim Lanes */}
+          {selectedAgentLanes.length > 0 && (
+            <div className="flex-shrink-0 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)] px-4 py-3 mobile:px-3 mobile:py-2 overflow-hidden">
+              <AgentSwimLaneContainer
+                selectedAgents={selectedAgentLanes}
+                events={events}
+                timeRange="1m"
+                onUpdateSelectedAgents={setSelectedAgentLanes}
+              />
+            </div>
+          )}
+
+          {/* Event Feed */}
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <EventTimeline
+              events={events}
+              filters={filters}
+              uniqueAppNames={uniqueAppNames}
+              allAppNames={allAppNames}
+              stickToBottom={stickToBottom}
+              onStickToBottomChange={setStickToBottom}
+              onSelectAgent={toggleAgentLane}
+            />
+          </div>
+        </main>
       </div>
 
-      {/* Stick to bottom button */}
+      {/* ─── Floating Controls ─── */}
       <StickScrollButton
         stickToBottom={stickToBottom}
         onToggle={() => setStickToBottom((v) => !v)}
       />
 
-      {/* Error message */}
+      {/* Error bar */}
       {error && (
-        <div className="fixed bottom-4 left-4 mobile:bottom-3 mobile:left-3 mobile:right-3 bg-red-100 border border-red-400 text-red-700 px-3 py-2 mobile:px-2 mobile:py-1.5 rounded mobile:text-xs">
-          {error}
+        <div className="fixed bottom-4 left-4 mobile:bottom-3 mobile:left-3 mobile:right-3 z-50 flex items-center gap-2 px-3 py-2 rounded-lg border border-[rgba(255,107,107,0.3)] bg-[rgba(255,107,107,0.1)] backdrop-blur-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-accent-error)]" />
+          <span className="text-xs font-mono text-[var(--theme-accent-error)]">{error}</span>
         </div>
       )}
-
-      {/* Theme Manager */}
-      <ThemeManager isOpen={showThemeManager} onClose={() => setShowThemeManager(false)} />
 
       {/* Toast Notifications */}
       {toasts.map((toast, index) => (
@@ -208,5 +213,47 @@ export default function App() {
         />
       ))}
     </div>
+  );
+}
+
+/* ─── Sub-components ─── */
+
+function StatPill({ label, value, color }: { label: string; value: number; color?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs font-mono">
+      <span className="text-[var(--theme-text-tertiary)] uppercase text-[10px] tracking-wider">{label}</span>
+      <span
+        className="font-semibold tabular-nums"
+        style={{ color: color || 'var(--theme-text-primary)' }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function HeaderButton({
+  onClick,
+  active,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`p-1.5 rounded-md transition-all duration-150 ${
+        active
+          ? 'text-[var(--theme-primary)] bg-[var(--theme-primary-glow)]'
+          : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)]'
+      }`}
+    >
+      {children}
+    </button>
   );
 }

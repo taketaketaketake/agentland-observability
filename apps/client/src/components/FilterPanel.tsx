@@ -31,12 +31,14 @@ export default function FilterPanel({ filters, onFiltersChange }: FilterPanelPro
   }, []);
 
   const selectClass =
-    'text-sm px-2 py-1 rounded border border-[var(--theme-border-primary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]';
+    'text-[11px] font-mono px-2.5 py-1 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] appearance-none cursor-pointer';
+
+  const hasActiveFilters = filters.sourceApp || filters.sessionId || filters.eventType;
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 bg-[var(--theme-bg-tertiary)] border-b border-[var(--theme-border-primary)]">
-      <span className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">
-        Filters
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-tertiary)]">
+      <span className="text-[9px] font-mono font-semibold tracking-widest uppercase text-[var(--theme-text-tertiary)]">
+        Filter
       </span>
 
       <select
@@ -72,10 +74,10 @@ export default function FilterPanel({ filters, onFiltersChange }: FilterPanelPro
         ))}
       </select>
 
-      {(filters.sourceApp || filters.sessionId || filters.eventType) && (
+      {hasActiveFilters && (
         <button
           onClick={() => onFiltersChange({ sourceApp: '', sessionId: '', eventType: '' })}
-          className="text-xs text-[var(--theme-accent-error)] hover:underline"
+          className="text-[10px] font-mono text-[var(--theme-accent-error)] hover:underline transition-colors"
         >
           Clear
         </button>

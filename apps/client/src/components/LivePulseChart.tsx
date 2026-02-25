@@ -75,32 +75,34 @@ export default function LivePulseChart({
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [chartData]);
 
-  // Count totals for current data
   const totalEvents = chartData.reduce((sum, d) => sum + d.count, 0);
 
   return (
-    <div className="bg-[var(--theme-bg-primary)] border-b border-[var(--theme-border-primary)]">
+    <div className="flex-shrink-0 border-b border-[var(--theme-border-primary)] bg-[var(--theme-bg-primary)]">
       {/* Controls bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 mobile:px-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-[var(--theme-text-secondary)]">
-            {'\u{1F4CA}'} Live
-          </span>
-          <span className="text-xs text-[var(--theme-text-tertiary)]">
-            {totalEvents} events | {uniqueApps.length} agents
+      <div className="flex items-center justify-between px-4 py-1.5 mobile:px-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary)] animate-live-blink" />
+            <span className="text-[10px] font-mono font-semibold tracking-widest uppercase text-[var(--theme-text-tertiary)]">
+              Live
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-[var(--theme-text-quaternary)] tabular-nums">
+            {totalEvents} events / {uniqueApps.length} agents
           </span>
         </div>
 
         {/* Time range selector */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 bg-[var(--theme-bg-tertiary)] rounded-md p-0.5">
           {TIME_RANGES.map((range) => (
             <button
               key={range}
               onClick={() => handleTimeRangeChange(range)}
-              className={`text-xs px-2 py-0.5 rounded transition-colors ${
+              className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded transition-all duration-150 ${
                 timeRange === range
-                  ? 'bg-[var(--theme-primary)] text-white'
-                  : 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-quaternary)]'
+                  ? 'bg-[var(--theme-primary)] text-[var(--theme-bg-primary)] shadow-sm'
+                  : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-secondary)]'
               }`}
             >
               {range}
@@ -110,7 +112,7 @@ export default function LivePulseChart({
       </div>
 
       {/* Canvas chart */}
-      <div className="h-24 mobile:h-16 px-1">
+      <div className="h-20 mobile:h-14 px-1">
         <canvas ref={canvasRef} className="w-full h-full" />
       </div>
     </div>

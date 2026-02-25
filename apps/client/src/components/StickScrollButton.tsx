@@ -7,15 +7,16 @@ export default function StickScrollButton({ stickToBottom, onToggle }: StickScro
   return (
     <button
       onClick={onToggle}
-      className={`fixed bottom-4 right-4 mobile:bottom-3 mobile:right-3 p-2.5 rounded-full shadow-lg transition-all duration-200 border ${
+      className={`fixed bottom-4 right-4 mobile:bottom-3 mobile:right-3 p-2 rounded-lg transition-all duration-200 border backdrop-blur-sm ${
         stickToBottom
-          ? 'bg-[var(--theme-primary)] text-white border-[var(--theme-primary-dark)] hover:bg-[var(--theme-primary-hover)]'
-          : 'bg-[var(--theme-bg-primary)] text-[var(--theme-text-secondary)] border-[var(--theme-border-secondary)] hover:bg-[var(--theme-bg-tertiary)]'
+          ? 'bg-[var(--theme-primary)] text-[var(--theme-bg-primary)] border-[var(--theme-primary-dark)] shadow-lg'
+          : 'bg-[var(--theme-bg-elevated)] text-[var(--theme-text-tertiary)] border-[var(--theme-border-secondary)] hover:text-[var(--theme-text-secondary)] hover:border-[var(--theme-border-tertiary)]'
       }`}
+      style={stickToBottom ? { boxShadow: '0 0 20px -5px rgba(0, 229, 160, 0.4)' } : {}}
       title={stickToBottom ? 'Auto-scroll ON' : 'Auto-scroll OFF'}
     >
       <svg
-        className="w-5 h-5"
+        className="w-4 h-4"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
