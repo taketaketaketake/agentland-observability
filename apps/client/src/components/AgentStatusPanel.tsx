@@ -6,6 +6,7 @@ import { useEventColors } from '../hooks/useEventColors';
 interface AgentStatusPanelProps {
   events: HookEvent[];
   onSelectAgent: (agentName: string) => void;
+  onViewTranscript?: (sessionId: string, agentId: string) => void;
 }
 
 function formatTimeSince(ms: number): string {
@@ -23,7 +24,7 @@ const STATUS_CONFIG: Record<AgentStatus, { label: string; color: string; glow: s
   stopped: { label: 'STOPPED', color: 'var(--theme-text-tertiary)', glow: 'transparent' },
 };
 
-export default function AgentStatusPanel({ events, onSelectAgent }: AgentStatusPanelProps) {
+export default function AgentStatusPanel({ events, onSelectAgent, onViewTranscript }: AgentStatusPanelProps) {
   const agents = useAgentStatus(events);
   const { getHexColorForApp } = useEventColors();
   const [, setTick] = useState(0);
@@ -128,6 +129,32 @@ export default function AgentStatusPanel({ events, onSelectAgent }: AgentStatusP
                       {agent.eventCount}
                     </span>
                   </div>
+
+                  {/* Transcript button */}
+                  {onViewTranscript && (
+                    <div className="mt-1.5 pt-1.5 border-t border-[var(--theme-border-primary)]">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewTranscript(agent.sessionId, agent.agentId);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.stopPropagation();
+                            onViewTranscript(agent.sessionId, agent.agentId);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 text-[9px] font-mono text-[var(--theme-text-quaternary)] hover:text-[var(--theme-primary)] transition-colors cursor-pointer"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        VIEW TRANSCRIPT
+                      </span>
+                    </div>
+                  )}
                 </div>
               </button>
             );

@@ -53,6 +53,20 @@ export interface WebSocketMessage {
   data: HookEvent | HookEvent[] | HumanInTheLoopResponse;
 }
 
+export interface TranscriptMessage {
+  id?: number;
+  session_id: string;
+  source_app: string;
+  role: 'user' | 'assistant';
+  content: string;
+  thinking?: string;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  timestamp: string;
+  uuid: string;
+}
+
 export type TimeRange = '1m' | '3m' | '5m' | '10m';
 
 export interface ChartDataPoint {

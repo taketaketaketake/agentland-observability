@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import type { HookEvent, FilterOptions } from './types';
+import type { HookEvent, FilterOptions, TranscriptMessage } from './types';
 
 let db: Database;
 
@@ -29,6 +29,26 @@ export function initDatabase(): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_session_id ON events(session_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_hook_event_type ON events(hook_event_type)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp)');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      source_app TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      thinking TEXT,
+      model TEXT,
+      input_tokens INTEGER,
+      output_tokens INTEGER,
+      timestamp TEXT NOT NULL,
+      uuid TEXT NOT NULL
+    )
+  `);
+
+  db.exec('CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_uuid ON messages(uuid)');
 }
 
 export function insertEvent(event: HookEvent): HookEvent {
@@ -134,6 +154,60 @@ export function updateEventHITLResponse(id: number, response: any): HookEvent | 
     humanInTheLoopStatus: row.humanInTheLoopStatus ? JSON.parse(row.humanInTheLoopStatus) : undefined,
     model_name: row.model_name || undefined,
   };
+}
+
+export function insertMessages(messages: TranscriptMessage[]): number {
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO messages (session_id, source_app, role, content, thinking, model, input_tokens, output_tokens, timestamp, uuid)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertMany = db.transaction((msgs: TranscriptMessage[]) => {
+    let inserted = 0;
+    for (const msg of msgs) {
+      const result = stmt.run(
+        msg.session_id,
+        msg.source_app,
+        msg.role,
+        msg.content,
+        msg.thinking || null,
+        msg.model || null,
+        msg.input_tokens ?? null,
+        msg.output_tokens ?? null,
+        msg.timestamp,
+        msg.uuid,
+      );
+      if (result.changes > 0) inserted++;
+    }
+    return inserted;
+  });
+
+  return insertMany(messages);
+}
+
+export function getSessionMessages(sessionId: string): TranscriptMessage[] {
+  const stmt = db.prepare(`
+    SELECT id, session_id, source_app, role, content, thinking, model, input_tokens, output_tokens, timestamp, uuid
+    FROM messages
+    WHERE session_id = ?
+    ORDER BY timestamp ASC
+  `);
+
+  const rows = stmt.all(sessionId) as any[];
+
+  return rows.map(row => ({
+    id: row.id,
+    session_id: row.session_id,
+    source_app: row.source_app,
+    role: row.role,
+    content: row.content,
+    thinking: row.thinking || undefined,
+    model: row.model || undefined,
+    input_tokens: row.input_tokens ?? undefined,
+    output_tokens: row.output_tokens ?? undefined,
+    timestamp: row.timestamp,
+    uuid: row.uuid,
+  }));
 }
 
 export { db };

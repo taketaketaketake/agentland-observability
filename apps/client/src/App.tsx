@@ -11,6 +11,7 @@ import ToastNotification from './components/ToastNotification';
 import AgentSwimLaneContainer from './components/AgentSwimLaneContainer';
 import AgentStatusPanel from './components/AgentStatusPanel';
 import InsightsPanel from './components/InsightsPanel';
+import SessionTranscriptPanel from './components/SessionTranscriptPanel';
 import { WS_URL } from './config';
 
 type DashboardTab = 'live' | 'insights';
@@ -35,6 +36,7 @@ export default function App() {
   const [, setCurrentTimeRange] = useState<TimeRange>('1m');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<DashboardTab>('live');
+  const [transcriptSession, setTranscriptSession] = useState<{ sessionId: string; agentId: string } | null>(null);
 
   // Toast notifications
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -74,6 +76,10 @@ export default function App() {
     clearEvents();
     setSelectedAgentLanes([]);
   }, [clearEvents]);
+
+  const handleViewTranscript = useCallback((sessionId: string, agentId: string) => {
+    setTranscriptSession({ sessionId, agentId });
+  }, []);
 
   const activeCount = agents.filter(a => a.status === 'active').length;
   const idleCount = agents.filter(a => a.status === 'idle').length;
@@ -170,7 +176,7 @@ export default function App() {
         {/* ─── Sidebar: Agent Panel (Live tab only) ─── */}
         {activeTab === 'live' && sidebarOpen && (
           <aside className="w-64 mobile:w-56 flex-shrink-0 border-r border-[var(--theme-border-primary)] bg-[var(--theme-bg-secondary)] flex flex-col overflow-hidden">
-            <AgentStatusPanel events={events} onSelectAgent={toggleAgentLane} />
+            <AgentStatusPanel events={events} onSelectAgent={toggleAgentLane} onViewTranscript={handleViewTranscript} />
           </aside>
         )}
 
@@ -244,6 +250,15 @@ export default function App() {
           onDismiss={() => dismissToast(toast.id)}
         />
       ))}
+
+      {/* Transcript Panel */}
+      {transcriptSession && (
+        <SessionTranscriptPanel
+          sessionId={transcriptSession.sessionId}
+          agentId={transcriptSession.agentId}
+          onClose={() => setTranscriptSession(null)}
+        />
+      )}
     </div>
   );
 }

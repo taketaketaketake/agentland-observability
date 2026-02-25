@@ -41,3 +41,17 @@ export interface FilterOptions {
   session_ids: string[];
   hook_event_types: string[];
 }
+
+export interface TranscriptMessage {
+  id?: number;
+  session_id: string;
+  source_app: string;
+  role: 'user' | 'assistant';
+  content: string;
+  thinking?: string;
+  model?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  timestamp: string;
+  uuid: string;
+}

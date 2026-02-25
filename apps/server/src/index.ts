@@ -1,5 +1,5 @@
-import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse } from './db';
-import type { HookEvent, HumanInTheLoopResponse } from './types';
+import { initDatabase, insertEvent, getFilterOptions, getRecentEvents, updateEventHITLResponse, insertMessages, getSessionMessages } from './db';
+import type { HookEvent, HumanInTheLoopResponse, TranscriptMessage } from './types';
 
 initDatabase();
 
@@ -154,6 +154,44 @@ const server = Bun.serve({
           headers: { ...headers, 'Content-Type': 'application/json' },
         });
       }
+    }
+
+    // POST /transcripts
+    if (url.pathname === '/transcripts' && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        const messages: TranscriptMessage[] = body.messages;
+        if (!Array.isArray(messages) || messages.length === 0) {
+          return new Response(JSON.stringify({ error: 'messages array required' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+          });
+        }
+        const inserted = insertMessages(messages);
+        return new Response(JSON.stringify({ inserted, total: messages.length }), {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: 'Invalid request' }), {
+          status: 400,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // GET /transcripts/:session_id
+    if (url.pathname.startsWith('/transcripts/') && req.method === 'GET') {
+      const sessionId = url.pathname.slice('/transcripts/'.length);
+      if (!sessionId) {
+        return new Response(JSON.stringify({ error: 'session_id required' }), {
+          status: 400,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
+      const messages = getSessionMessages(sessionId);
+      return new Response(JSON.stringify(messages), {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+      });
     }
 
     // WebSocket upgrade
