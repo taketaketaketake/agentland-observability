@@ -2,20 +2,22 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/session_start.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/session_start.py"
           }
         ]
       }
     ],
     "SessionEnd": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/session_end.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/session_end.py"
           }
         ]
       }
@@ -26,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/before_tool.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/before_tool.py"
           }
         ]
       }
@@ -37,47 +39,51 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/after_tool.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/after_tool.py"
           }
         ]
       }
     ],
     "Notification": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/notification.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/notification.py"
           }
         ]
       }
     ],
     "BeforeAgent": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/before_agent.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/before_agent.py"
           }
         ]
       }
     ],
     "AfterAgent": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/after_agent.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/after_agent.py"
           }
         ]
       }
     ],
     "PreCompress": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --script .gemini/hooks/pre_compress.py"
+            "command": "uv run --script $GEMINI_PROJECT_DIR/.gemini/hooks/pre_compress.py"
           }
         ]
       }
