@@ -269,10 +269,31 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
             });
           }
 
+          // Resolve session_ids: prefer session_ids array, fallback to single session_id
+          const sessionIds: string[] = body.scope.session_ids?.length
+            ? body.scope.session_ids
+            : body.scope.session_id
+              ? [body.scope.session_id]
+              : [];
+
+          // Store in DB: JSON array if 2+, plain string if 1, null if none
+          const scopeSessionId = sessionIds.length >= 2
+            ? JSON.stringify(sessionIds)
+            : sessionIds.length === 1
+              ? sessionIds[0]
+              : null;
+
+          // Normalize scope for the evaluator with session_ids array
+          const normalizedScope = {
+            ...body.scope,
+            session_ids: sessionIds.length > 0 ? sessionIds : undefined,
+            session_id: sessionIds.length === 1 ? sessionIds[0] : undefined,
+          };
+
           const run = createEvalRun({
             evaluator_type: body.evaluator_type,
             scope_type: body.scope.type,
-            scope_session_id: body.scope.session_id ?? null,
+            scope_session_id: scopeSessionId,
             scope_source_app: body.scope.source_app ?? null,
             status: 'pending',
             progress_current: 0,
@@ -298,7 +319,7 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
             });
           };
 
-          runEvaluation(run, body.scope, body.options ?? {}, broadcastProgress).catch(err => {
+          runEvaluation(run, normalizedScope, body.options ?? {}, broadcastProgress).catch(err => {
             console.error(`[evaluations] Run ${run.id} failed:`, err);
           });
 

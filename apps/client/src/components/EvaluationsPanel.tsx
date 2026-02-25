@@ -4,6 +4,7 @@ import type { EvaluatorType, EvalRun, EvalSummary, EvalProgress, ProviderInfo, T
 import SuccessRateChart from './charts/SuccessRateChart';
 import ScoreDistributionChart from './charts/ScoreDistributionChart';
 import EvalRunDetailPanel from './EvalRunDetailPanel';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 interface EvaluationsPanelProps {
   onEvaluationProgress?: (callback: (progress: EvalProgress) => void) => void;
@@ -70,8 +71,8 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
   const [evalFilters, setEvalFilters] = useState<{
     timeRange: TimeRangeOption;
     projectDir: string;
-    sessionId: string;
-  }>({ timeRange: '24h', projectDir: '', sessionId: '' });
+    sessionIds: string[];
+  }>({ timeRange: '24h', projectDir: '', sessionIds: [] });
 
   // Wire up WebSocket progress
   useEffect(() => {
@@ -83,10 +84,13 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
   // Re-fetch sessions when project filter changes
   useEffect(() => {
     fetchSessions(evalFilters.projectDir || undefined);
-    setEvalFilters(prev => ({ ...prev, sessionId: '' }));
+    setEvalFilters(prev => ({ ...prev, sessionIds: [] }));
   }, [evalFilters.projectDir, fetchSessions]);
 
   const TIME_RANGE_MAP: Record<TimeRangeOption, number | undefined> = {
+    '1h': 1,
+    '4h': 4,
+    '12h': 12,
     '24h': 24,
     '7d': 168,
     '30d': 720,
@@ -97,8 +101,8 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
     if (runningButtons.has(type)) return;
     setRunningButtons(prev => new Set(prev).add(type));
     const provider = selectedProviders[type] || undefined;
-    const scope = evalFilters.sessionId
-      ? { type: 'session' as const, session_id: evalFilters.sessionId }
+    const scope = evalFilters.sessionIds.length > 0
+      ? { type: 'session' as const, session_ids: evalFilters.sessionIds }
       : { type: 'global' as const };
     const options: Record<string, any> = { provider };
     const timeHours = TIME_RANGE_MAP[evalFilters.timeRange];
@@ -222,6 +226,9 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
           onChange={(e) => setEvalFilters(prev => ({ ...prev, timeRange: e.target.value as TimeRangeOption }))}
           className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] appearance-none cursor-pointer"
         >
+          <option value="1h">Last hour</option>
+          <option value="4h">Last 4 hours</option>
+          <option value="12h">Last 12 hours</option>
           <option value="24h">Last 24 hours</option>
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
@@ -241,22 +248,19 @@ export default function EvaluationsPanel({ onEvaluationProgress }: EvaluationsPa
           ))}
         </select>
 
-        <select
-          value={evalFilters.sessionId}
-          onChange={(e) => setEvalFilters(prev => ({ ...prev, sessionId: e.target.value }))}
-          className="text-[11px] font-mono px-2.5 py-1 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] appearance-none cursor-pointer"
-        >
-          <option value="">All Sessions</option>
-          {sessions.map((s, i) => (
-            <option key={s.session_id} value={s.session_id}>
-              {i === 0 ? '(latest) ' : ''}{sessionLabel(s)}
-            </option>
-          ))}
-        </select>
+        <MultiSelectDropdown
+          options={sessions.map((s, i) => ({
+            value: s.session_id,
+            label: `${i === 0 ? '(latest) ' : ''}${sessionLabel(s)}`,
+          }))}
+          selected={evalFilters.sessionIds}
+          onChange={(ids) => setEvalFilters(prev => ({ ...prev, sessionIds: ids }))}
+          placeholder="All Sessions"
+        />
 
-        {(evalFilters.timeRange !== '24h' || evalFilters.projectDir || evalFilters.sessionId) && (
+        {(evalFilters.timeRange !== '24h' || evalFilters.projectDir || evalFilters.sessionIds.length > 0) && (
           <button
-            onClick={() => setEvalFilters({ timeRange: '24h', projectDir: '', sessionId: '' })}
+            onClick={() => setEvalFilters({ timeRange: '24h', projectDir: '', sessionIds: [] })}
             className="text-[10px] font-mono text-[var(--theme-accent-error)] hover:underline transition-colors"
           >
             Reset
@@ -578,6 +582,13 @@ function RunRow({
       </td>
       <td className="px-4 py-2 text-xs font-mono text-[var(--theme-text-tertiary)]">
         {run.scope_type}
+        {run.scope_session_id && (() => {
+          try {
+            const parsed = JSON.parse(run.scope_session_id);
+            if (Array.isArray(parsed)) return ` (${parsed.length} sessions)`;
+          } catch { /* not JSON */ }
+          return ` (${run.scope_session_id.substring(0, 8)}...)`;
+        })()}
         {run.scope_source_app && ` (${run.scope_source_app})`}
       </td>
       <td className="px-4 py-2 text-xs font-mono text-[var(--theme-text-tertiary)] text-right tabular-nums">

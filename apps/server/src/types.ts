@@ -77,6 +77,7 @@ export type EvalItemType = 'tool_invocation' | 'assistant_message' | 'thinking_b
 export interface EvalScope {
   type: EvalScopeType;
   session_id?: string;
+  session_ids?: string[];
   source_app?: string;
 }
 

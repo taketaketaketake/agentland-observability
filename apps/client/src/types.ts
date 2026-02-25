@@ -88,6 +88,7 @@ export type EvalItemType = 'tool_invocation' | 'assistant_message' | 'thinking_b
 export interface EvalScope {
   type: EvalScopeType;
   session_id?: string;
+  session_ids?: string[];
   source_app?: string;
 }
 
@@ -104,7 +105,7 @@ export interface ProjectInfo {
   session_count: number;
 }
 
-export type TimeRangeOption = '24h' | '7d' | '30d' | 'all';
+export type TimeRangeOption = '1h' | '4h' | '12h' | '24h' | '7d' | '30d' | 'all';
 
 export interface EvalRun {
   id: number;

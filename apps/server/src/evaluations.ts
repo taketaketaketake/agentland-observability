@@ -279,7 +279,7 @@ export function getEvalSummary() {
 
 // ─── Queries for evaluators ───
 
-export function getToolEvents(opts: { since?: number; session_id?: string; source_app?: string; project_dir?: string }) {
+export function getToolEvents(opts: { since?: number; session_id?: string; session_ids?: string[]; source_app?: string; project_dir?: string }) {
   const conditions: string[] = ["hook_event_type IN ('PostToolUse', 'PostToolUseFailure')"];
   const params: any[] = [];
 
@@ -287,7 +287,10 @@ export function getToolEvents(opts: { since?: number; session_id?: string; sourc
     conditions.push('timestamp >= ?');
     params.push(opts.since);
   }
-  if (opts.session_id) {
+  if (opts.session_ids && opts.session_ids.length > 0) {
+    conditions.push(`session_id IN (${opts.session_ids.map(() => '?').join(',')})`);
+    params.push(...opts.session_ids);
+  } else if (opts.session_id) {
     conditions.push('session_id = ?');
     params.push(opts.session_id);
   }
@@ -317,7 +320,7 @@ export function getToolEvents(opts: { since?: number; session_id?: string; sourc
   }));
 }
 
-export function getAssistantMessages(opts: { since?: number; session_id?: string; source_app?: string; with_thinking?: boolean; project_dir?: string }) {
+export function getAssistantMessages(opts: { since?: number; session_id?: string; session_ids?: string[]; source_app?: string; with_thinking?: boolean; project_dir?: string }) {
   const conditions: string[] = ["role = 'assistant'", "source_app != 'evaluation-runner'"];
   const params: any[] = [];
 
@@ -325,7 +328,10 @@ export function getAssistantMessages(opts: { since?: number; session_id?: string
     conditions.push("timestamp >= ?");
     params.push(new Date(opts.since).toISOString());
   }
-  if (opts.session_id) {
+  if (opts.session_ids && opts.session_ids.length > 0) {
+    conditions.push(`session_id IN (${opts.session_ids.map(() => '?').join(',')})`);
+    params.push(...opts.session_ids);
+  } else if (opts.session_id) {
     conditions.push('session_id = ?');
     params.push(opts.session_id);
   }

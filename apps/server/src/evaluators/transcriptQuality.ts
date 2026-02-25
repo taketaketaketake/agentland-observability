@@ -79,6 +79,7 @@ export const transcriptQualityEvaluator: Evaluator = {
     const allMessages = getAssistantMessages({
       since,
       session_id: ctx.scope.session_id,
+      session_ids: ctx.scope.session_ids,
       source_app: ctx.scope.source_app,
       project_dir: ctx.options.project_dir,
     });
