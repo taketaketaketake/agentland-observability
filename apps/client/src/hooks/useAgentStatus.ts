@@ -39,7 +39,7 @@ export function useAgentStatus(events: HookEvent[]): AgentInfo[] {
       if (!entry) {
         // Derive project name from cwd (last path segment)
         const cwd = event.payload?.cwd || '';
-        const projectName = cwd ? cwd.replace(/\/+$/, '').split('/').pop() || cwd : '';
+        const projectName = cwd ? cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || cwd : '';
         entry = { events: [], sourceApp: event.source_app, sessionId: event.session_id, projectName };
         agentMap.set(key, entry);
       }

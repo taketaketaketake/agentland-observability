@@ -13,6 +13,15 @@ import requests
 SERVER_URL = os.environ.get("OBSERVABILITY_SERVER_URL", "http://localhost:4000")
 
 
+def get_source_app(cwd: str | None = None) -> str:
+    """Derive source_app from CLAUDE_SOURCE_APP env var or cwd folder name."""
+    env_val = os.environ.get("CLAUDE_SOURCE_APP")
+    if env_val:
+        return env_val
+    path = cwd or os.getcwd()
+    return os.path.basename(path.rstrip("/\\")) or "claude-code"
+
+
 def send_event(hook_event_type: str, extra: dict | None = None) -> None:
     """Read hook data from stdin and POST it to the server."""
     try:
@@ -25,7 +34,7 @@ def send_event(hook_event_type: str, extra: dict | None = None) -> None:
         return
 
     session_id = data.get("session_id", "unknown")
-    source_app = os.environ.get("CLAUDE_SOURCE_APP", "claude-code")
+    source_app = get_source_app(data.get("cwd"))
 
     payload = data if isinstance(data, dict) else {"raw": data}
 

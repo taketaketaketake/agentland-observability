@@ -211,7 +211,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     session_id = data.get("session_id", "unknown")
-    source_app = os.environ.get("CLAUDE_SOURCE_APP", "claude-code")
+    from send_event import get_source_app
+    source_app = get_source_app(cwd)
     cwd = data.get("cwd", os.getcwd())
     transcript_path = data.get("transcript_path")
 

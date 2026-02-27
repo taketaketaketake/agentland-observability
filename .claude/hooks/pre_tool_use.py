@@ -24,7 +24,8 @@ def main() -> None:
         return
 
     session_id = data.get("session_id", "unknown")
-    source_app = os.environ.get("CLAUDE_SOURCE_APP", "claude-code")
+    from send_event import get_source_app
+    source_app = get_source_app(data.get("cwd"))
     tool_name = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})
 
@@ -69,6 +70,7 @@ def main() -> None:
         "payload": {
             "tool_name": tool_name,
             "tool_input": tool_input,
+            "cwd": data.get("cwd", ""),
         },
     }
 
