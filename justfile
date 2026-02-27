@@ -3,7 +3,7 @@
 
 set dotenv-load
 set quiet
-set windows-shell := ["C:/Program Files/Git/usr/bin/bash.exe", "-cu"]
+set windows-shell := ["C:/Program Files/Git/usr/bin/bash.exe", "-lcu"]
 
 server_port := env("SERVER_PORT", "4000")
 client_port := env("CLIENT_PORT", "5173")
