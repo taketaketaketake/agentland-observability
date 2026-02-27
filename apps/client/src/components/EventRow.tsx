@@ -46,7 +46,7 @@ export default function EventRow({ event, index = 0, onSelectAgent, onViewTransc
   const toolName = event.payload?.tool_name || '';
   const truncatedSession = event.session_id.substring(0, 8);
   const cwd = event.payload?.cwd || '';
-  const projectName = cwd ? cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || '' : '';
+  const projectName = cwd ? (() => { const parts = cwd.replace(/\\/g, '/').split('/'); const idx = parts.indexOf('github-projects'); return idx >= 0 && idx + 1 < parts.length ? parts[idx + 1] : parts.pop() || ''; })() : '';
   const agentId = projectName
     ? `${projectName}:${truncatedSession}`
     : `${event.source_app}:${truncatedSession}`;

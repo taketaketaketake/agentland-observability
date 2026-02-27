@@ -14,12 +14,17 @@ SERVER_URL = os.environ.get("OBSERVABILITY_SERVER_URL", "http://localhost:4000")
 
 
 def get_source_app(cwd: str | None = None) -> str:
-    """Derive source_app from CLAUDE_SOURCE_APP env var or cwd folder name."""
+    """Derive source_app from CLAUDE_SOURCE_APP env var or cwd project name."""
     env_val = os.environ.get("CLAUDE_SOURCE_APP")
     if env_val:
         return env_val
-    path = cwd or os.getcwd()
-    return os.path.basename(path.rstrip("/\\")) or "claude-code"
+    path = (cwd or os.getcwd()).replace("\\", "/")
+    # Extract first folder after github-projects/
+    parts = path.split("/")
+    for i, part in enumerate(parts):
+        if part == "github-projects" and i + 1 < len(parts):
+            return parts[i + 1]
+    return os.path.basename(path.rstrip("/")) or "claude-code"
 
 
 def send_event(hook_event_type: str, extra: dict | None = None) -> None:

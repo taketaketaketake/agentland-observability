@@ -39,7 +39,7 @@ export function useAgentStatus(events: HookEvent[]): AgentInfo[] {
       if (!entry) {
         // Derive project name from cwd (last path segment)
         const cwd = event.payload?.cwd || '';
-        const projectName = cwd ? cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || cwd : '';
+        const projectName = cwd ? (() => { const parts = cwd.replace(/\\/g, '/').split('/'); const idx = parts.indexOf('github-projects'); return idx >= 0 && idx + 1 < parts.length ? parts[idx + 1] : parts.pop() || cwd; })() : '';
         entry = { events: [], sourceApp: event.source_app, sessionId: event.session_id, projectName };
         agentMap.set(key, entry);
       }
