@@ -87,7 +87,7 @@ def ingest_transcript(session_id: str, source_app: str, cwd: str, transcript_pat
     pending_thinking: list[str] = []
 
     try:
-        with open(jsonl_path, "r") as f:
+        with open(jsonl_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:

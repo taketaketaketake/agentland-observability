@@ -77,8 +77,6 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
 
   initDatabase(dbPath);
 
-  const corsOrigin = process.env.CORS_ORIGIN || `http://localhost:${process.env.VITE_PORT || '5173'}`;
-
   const wsClients = new Set<any>();
 
   const server = Bun.serve({
@@ -86,9 +84,10 @@ export function createServer(options?: { port?: number; dbPath?: string }) {
 
     async fetch(req: Request) {
       const url = new URL(req.url);
+      const origin = req.headers.get('Origin') || '*';
 
       const headers = {
-        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       };
